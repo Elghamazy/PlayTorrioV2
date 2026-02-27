@@ -1,0 +1,75 @@
+name: play_torrio_native
+description: "PlayTorrio - Your cinema universe, Stream anything, anywhere."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  http: ^1.6.0
+  cached_network_image: ^3.4.1
+  carousel_slider: ^5.1.2
+  path: ^1.9.1
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^1.0.7
+  window_manager: ^0.5.1
+  flutter_inappwebview: ^6.1.5
+  shared_preferences: ^2.5.2
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+  shelf_proxy: ^1.0.4 
+  html: ^0.15.4
+  path_provider: ^2.1.5
+  youtube_explode_dart: ^3.0.5
+  logging: ^1.2.0
+  audio_service: ^0.18.17
+  audio_session: ^0.1.25
+  url_launcher: ^6.3.1
+  flutter_secure_storage: ^9.2.4
+  permission_handler: ^11.3.1
+  connectivity_plus: ^7.0.0
+  screen_brightness: ^2.1.7
+  volume_controller: ^3.4.1
+  wakelock_plus: ^1.4.0
+  google_fonts: ^8.0.2
+  shimmer: ^3.0.0
+  visibility_detector: ^0.4.0+2
+  smooth_page_indicator: ^2.0.1
+  transparent_image: ^2.0.1
+  xml: ^6.5.0
+  archive: ^4.0.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  windows:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    icon_size: 48
+  image_path: "assets/icon/icon.png"
+
+flutter:
+
+  uses-material-design: true
+
+  assets:
+    - assets/icon/
+    # TorrServer binaries — CI downloads these automatically.
+    # For local dev, download from https://github.com/YouROK/TorrServer/releases
+    # and uncomment the line for your platform.
+    #- assets/bin/windows/TorrServer.exe
+    #- assets/bin/linux/TorrServer
+    #- assets/bin/macos/TorrServer
