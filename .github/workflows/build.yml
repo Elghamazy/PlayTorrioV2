@@ -138,16 +138,18 @@ jobs:
 
       - name: Generate Linux platform files
         run: |
-          flutter create --platforms=linux \
-            --project-name play_torrio_native /tmp/ptgen
-          cp -r /tmp/ptgen/linux ./
+          flutter create --platforms=linux .
 
           # Fix binary name & window title
           sed -i 's/set(BINARY_NAME "play_torrio_native")/set(BINARY_NAME "PlayTorrio")/' \
             linux/CMakeLists.txt
           sed -i 's/set(APPLICATION_ID "com.example.play_torrio_native")/set(APPLICATION_ID "com.playtorrio.app")/' \
             linux/CMakeLists.txt
-          sed -i 's/play_torrio_native/PlayTorrio/g' linux/my_application.cc
+          
+          # Fix application name in my_application.cc if it exists
+          if [ -f "linux/my_application.cc" ]; then
+            sed -i 's/play_torrio_native/PlayTorrio/g' linux/my_application.cc
+          fi
 
       - name: Download TorrServer
         run: |
@@ -204,18 +206,21 @@ jobs:
 
       - name: Generate macOS platform files
         run: |
-          flutter create --platforms=macos \
-            --project-name play_torrio_native /tmp/ptgen
-          cp -r /tmp/ptgen/macos ./
+          flutter create --platforms=macos .
 
           # Network entitlements (TorrServer runs a local TCP server)
           for f in macos/Runner/DebugProfile.entitlements macos/Runner/Release.entitlements; do
-            plutil -replace 'com.apple.security.network.server' -bool true "$f"
-            plutil -replace 'com.apple.security.network.client' -bool true "$f"
+            # Use PlistBuddy to safely add/modify boolean values
+            /usr/libexec/PlistBuddy -c "Delete :com.apple.security.network.server" "$f" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.server bool true" "$f"
+            /usr/libexec/PlistBuddy -c "Delete :com.apple.security.network.client" "$f" 2>/dev/null || true
+            /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.client bool true" "$f"
           done
 
           # App name
-          plutil -replace CFBundleName -string 'PlayTorrio' \
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName PlayTorrio" \
+            macos/Runner/Info.plist || \
+          /usr/libexec/PlistBuddy -c "Add :CFBundleName string PlayTorrio" \
             macos/Runner/Info.plist
 
       - name: Download TorrServer
