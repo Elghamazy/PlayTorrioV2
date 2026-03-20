@@ -325,6 +325,76 @@ jobs:
           EOF
 
       - run: flutter pub get
+
+      # ── Smoke-test on iOS Simulator ──────────────────────────────────────
+      - name: Boot iOS Simulator
+        run: |
+          # Pick the first available iPhone simulator
+          DEVICE_UDID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for rt, devs in data['devices'].items():
+              if 'iOS' in rt:
+                  for d in devs:
+                      if 'iPhone' in d['name'] and d['isAvailable']:
+                          print(d['udid']); sys.exit(0)
+          sys.exit(1)")
+          echo "DEVICE_UDID=$DEVICE_UDID" >> "$GITHUB_ENV"
+          echo "Booting simulator $DEVICE_UDID …"
+          xcrun simctl boot "$DEVICE_UDID" 2>/dev/null || true
+          # Wait for the simulator runtime to be fully ready
+          xcrun simctl bootstatus "$DEVICE_UDID" -b
+
+      - name: Run app on Simulator (smoke test)
+        timeout-minutes: 4
+        continue-on-error: true
+        run: |
+          echo "════════════════════════════════════════════"
+          echo "  FLUTTER RUN — iOS Simulator smoke test"
+          echo "════════════════════════════════════════════"
+
+          # Run in debug mode on the simulator; capture all output
+          flutter run -d "$DEVICE_UDID" --debug 2>&1 | tee /tmp/flutter_run.log &
+          FLUTTER_PID=$!
+
+          # Let the app start and run for 90 seconds
+          sleep 90
+
+          echo ""
+          echo "════════════════════════════════════════════"
+          echo "  90 s elapsed — stopping flutter run"
+          echo "════════════════════════════════════════════"
+
+          kill "$FLUTTER_PID" 2>/dev/null || true
+          wait "$FLUTTER_PID" 2>/dev/null || true
+
+          echo ""
+          echo "════════════════════════════════════════════"
+          echo "  FULL LOG"
+          echo "════════════════════════════════════════════"
+          cat /tmp/flutter_run.log
+
+          # Surface errors prominently
+          if grep -qiE 'error|crash|exception|fatal' /tmp/flutter_run.log; then
+            echo ""
+            echo "⚠️  Potential issues found in log:"
+            grep -inE 'error|crash|exception|fatal' /tmp/flutter_run.log || true
+          fi
+
+      - name: Collect Simulator crash logs
+        if: always()
+        continue-on-error: true
+        run: |
+          # Grab the last 200 lines from the simulator's system log
+          xcrun simctl spawn "$DEVICE_UDID" log show \
+            --predicate 'subsystem == "com.apple.CoreSimulator" OR processImagePath CONTAINS "Runner"' \
+            --last 2m --style compact 2>/dev/null | tail -200 || true
+
+      - name: Shutdown Simulator
+        if: always()
+        run: xcrun simctl shutdown "$DEVICE_UDID" 2>/dev/null || true
+
+      # ── Release build ────────────────────────────────────────────────────
       - run: flutter build ios --release --no-codesign
 
       - name: Package as IPA
