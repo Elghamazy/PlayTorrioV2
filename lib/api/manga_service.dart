@@ -1,431 +1,400 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
+import 'package:html/parser.dart' as html_parser;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'local_server_service.dart';
+
+const String _baseUrl = 'https://weebcentral.com';
+const String _coverCdn = 'https://temp.compsci88.com/cover';
 
 class Manga {
-  final int mangaId;
-  final String hashId;
+  final String id;
   final String title;
-  final List<String> altTitles;
-  final String synopsis;
-  final String slug;
-  final int rank;
+  final String coverSmall;
+  final String coverNormal;
   final String type;
-  final MangaPoster poster;
-  final String originalLanguage;
   final String status;
-  final int finalVolume;
-  final double finalChapter;
-  final bool hasChapters;
-  final double latestChapter;
-  final int chapterUpdatedAt;
-  final int startDate;
-  final String endDate;
-  final int createdAt;
-  final int updatedAt;
-  final double ratedAvg;
-  final int ratedCount;
-  final int followsTotal;
-  final Map<String, String> links;
-  final bool isNsfw;
-  final int year;
-  final List<int> termIds;
+  final String year;
+  final String author;
+  final List<String> tags;
+  final String synopsis;
+  final String url;
 
   Manga({
-    required this.mangaId,
-    required this.hashId,
+    required this.id,
     required this.title,
-    required this.altTitles,
-    required this.synopsis,
-    required this.slug,
-    required this.rank,
-    required this.type,
-    required this.poster,
-    required this.originalLanguage,
-    required this.status,
-    required this.finalVolume,
-    required this.finalChapter,
-    required this.hasChapters,
-    required this.latestChapter,
-    required this.chapterUpdatedAt,
-    required this.startDate,
-    required this.endDate,
-    required this.createdAt,
-    required this.updatedAt,
-    required this.ratedAvg,
-    required this.ratedCount,
-    required this.followsTotal,
-    required this.links,
-    required this.isNsfw,
-    required this.year,
-    required this.termIds,
+    required this.coverSmall,
+    required this.coverNormal,
+    this.type = '',
+    this.status = '',
+    this.year = '',
+    this.author = '',
+    this.tags = const [],
+    this.synopsis = '',
+    this.url = '',
   });
 
   factory Manga.fromJson(Map<String, dynamic> json) {
     return Manga(
-      mangaId: json['manga_id'] is String ? int.tryParse(json['manga_id']) ?? 0 : (json['manga_id'] ?? 0),
-      hashId: json['hash_id'] ?? '',
+      id: json['id'] ?? '',
       title: json['title'] ?? '',
-      altTitles: (json['alt_titles'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      synopsis: json['synopsis'] ?? '',
-      slug: json['slug'] ?? '',
-      rank: json['rank'] is String ? int.tryParse(json['rank']) ?? 0 : (json['rank'] ?? 0),
+      coverSmall: json['cover_small'] ?? '',
+      coverNormal: json['cover_normal'] ?? '',
       type: json['type'] ?? '',
-      poster: MangaPoster.fromJson(json['poster'] ?? {}),
-      originalLanguage: json['original_language'] ?? '',
       status: json['status'] ?? '',
-      finalVolume: json['final_volume'] is String ? int.tryParse(json['final_volume']) ?? 0 : (json['final_volume'] ?? 0),
-      finalChapter: (json['final_chapter'] is String ? double.tryParse(json['final_chapter']) ?? 0 : json['final_chapter'] ?? 0).toDouble(),
-      hasChapters: json['has_chapters'] ?? false,
-      latestChapter: (json['latest_chapter'] is String ? double.tryParse(json['latest_chapter']) ?? 0 : json['latest_chapter'] ?? 0).toDouble(),
-      chapterUpdatedAt: json['chapter_updated_at'] is String ? int.tryParse(json['chapter_updated_at']) ?? 0 : (json['chapter_updated_at'] ?? 0),
-      startDate: json['start_date'] is String ? int.tryParse(json['start_date']) ?? 0 : (json['start_date'] ?? 0),
-      endDate: json['end_date']?.toString() ?? '?',
-      createdAt: json['created_at'] is String ? int.tryParse(json['created_at']) ?? 0 : (json['created_at'] ?? 0),
-      updatedAt: json['updated_at'] is String ? int.tryParse(json['updated_at']) ?? 0 : (json['updated_at'] ?? 0),
-      ratedAvg: (json['rated_avg'] is String ? double.tryParse(json['rated_avg']) ?? 0 : json['rated_avg'] ?? 0).toDouble(),
-      ratedCount: json['rated_count'] is String ? int.tryParse(json['rated_count']) ?? 0 : (json['rated_count'] ?? 0),
-      followsTotal: json['follows_total'] is String ? int.tryParse(json['follows_total']) ?? 0 : (json['follows_total'] ?? 0),
-      links: (json['links'] as Map?)?.map((k, v) => MapEntry(k.toString(), v.toString())) ?? {},
-      isNsfw: json['is_nsfw'] ?? false,
-      year: json['year'] is String ? int.tryParse(json['year']) ?? 0 : (json['year'] ?? 0),
-      termIds: (json['term_ids'] as List?)?.map((e) => e is String ? int.tryParse(e) ?? 0 : e as int).toList() ?? [],
+      year: json['year'] ?? '',
+      author: json['author'] ?? '',
+      tags: (json['tags'] as List?)?.cast<String>() ?? [],
+      synopsis: json['synopsis'] ?? '',
+      url: json['url'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'manga_id': mangaId,
-      'hash_id': hashId,
+      'id': id,
       'title': title,
-      'alt_titles': altTitles,
-      'synopsis': synopsis,
-      'slug': slug,
-      'rank': rank,
+      'cover_small': coverSmall,
+      'cover_normal': coverNormal,
       'type': type,
-      'poster': poster.toJson(),
-      'original_language': originalLanguage,
       'status': status,
-      'final_volume': finalVolume,
-      'final_chapter': finalChapter,
-      'has_chapters': hasChapters,
-      'latest_chapter': latestChapter,
-      'chapter_updated_at': chapterUpdatedAt,
-      'start_date': startDate,
-      'end_date': endDate,
-      'created_at': createdAt,
-      'updated_at': updatedAt,
-      'rated_avg': ratedAvg,
-      'rated_count': ratedCount,
-      'follows_total': followsTotal,
-      'links': links,
-      'is_nsfw': isNsfw,
       'year': year,
-      'term_ids': termIds,
-    };
-  }
-}
-
-class MangaPoster {
-  final String small;
-  final String medium;
-  final String large;
-
-  MangaPoster({
-    required this.small,
-    required this.medium,
-    required this.large,
-  });
-
-  factory MangaPoster.fromJson(Map<String, dynamic> json) {
-    return MangaPoster(
-      small: json['small'] ?? '',
-      medium: json['medium'] ?? '',
-      large: json['large'] ?? '',
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'small': small,
-      'medium': medium,
-      'large': large,
+      'author': author,
+      'tags': tags,
+      'synopsis': synopsis,
+      'url': url,
     };
   }
 }
 
 class MangaChapter {
-  final int chapterId;
-  final int mangaId;
+  final String id;
   final double number;
   final String name;
-  final String language;
-  final int volume;
-  final int votes;
-  final int createdAt;
-  final ScanlationGroup scanlationGroup;
+  final String url;
+  final String rawName;
 
   MangaChapter({
-    required this.chapterId,
-    required this.mangaId,
+    required this.id,
     required this.number,
-    required this.name,
-    required this.language,
-    required this.volume,
-    required this.votes,
-    required this.createdAt,
-    required this.scanlationGroup,
+    this.name = '',
+    this.url = '',
+    this.rawName = '',
   });
+
+  factory MangaChapter.fromRaw(String id, String rawName, String url) {
+    String cleaned = rawName;
+    if (cleaned.toLowerCase().startsWith('chapter')) {
+      cleaned = cleaned.substring(7).trim();
+    }
+    final separatorIndex = cleaned.indexOf(RegExp(r'[:\-–]'));
+    String numberStr;
+    String title;
+    if (separatorIndex > 0) {
+      numberStr = cleaned.substring(0, separatorIndex).trim();
+      title = cleaned.substring(separatorIndex + 1).trim();
+    } else {
+      numberStr = cleaned.trim();
+      title = '';
+    }
+    final number = double.tryParse(numberStr) ?? 0;
+    return MangaChapter(id: id, number: number, name: title, url: url, rawName: rawName);
+  }
 
   factory MangaChapter.fromJson(Map<String, dynamic> json) {
     return MangaChapter(
-      chapterId: json['chapter_id'] ?? 0,
-      mangaId: json['manga_id'] ?? 0,
-      number: (json['number'] is String ? double.tryParse(json['number']) ?? 0 : json['number'] ?? 0).toDouble(),
+      id: json['id']?.toString() ?? '',
+      number: (json['number'] is String
+              ? double.tryParse(json['number']) ?? 0
+              : json['number'] ?? 0)
+          .toDouble(),
       name: json['name'] ?? '',
-      language: json['language'] ?? '',
-      volume: json['volume'] ?? 0,
-      votes: json['votes'] ?? 0,
-      createdAt: json['created_at'] ?? 0,
-      scanlationGroup: ScanlationGroup.fromJson(json['scanlation_group'] ?? {}),
+      url: json['url'] ?? '',
+      rawName: json['raw_name'] ?? '',
     );
   }
-}
 
-class ScanlationGroup {
-  final int scanlationGroupId;
-  final String name;
-  final String slug;
-
-  ScanlationGroup({
-    required this.scanlationGroupId,
-    required this.name,
-    required this.slug,
-  });
-
-  factory ScanlationGroup.fromJson(Map<String, dynamic> json) {
-    return ScanlationGroup(
-      scanlationGroupId: json['scanlation_group_id'] ?? 0,
-      name: json['name'] ?? '',
-      slug: json['slug'] ?? '',
-    );
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'number': number,
+      'name': name,
+      'url': url,
+      'raw_name': rawName,
+    };
   }
 }
 
 class MangaService {
-  static const String _baseUrl = 'https://comix.to/api/v2';
   static const String _likedKey = 'liked_manga';
-  static const Map<String, String> _headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'application/json, text/plain, */*',
-  };
+  static const int _pageSize = 32;
+  static const String _userAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 
-  Future<List<Manga>> getManga({int page = 1, int? genreId}) async {
+  final http.Client _client = http.Client();
+
+  Map<String, String> get _headers => {
+        'User-Agent': _userAgent,
+        'Accept':
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      };
+
+  Future<String> _fetchHtml(String url) async {
+    final response = await _client.get(Uri.parse(url), headers: _headers);
+    if (response.statusCode != 200) {
+      throw Exception('HTTP ${response.statusCode} for $url');
+    }
+    return response.body;
+  }
+
+  String? _extractSeriesId(String url) {
+    final match = RegExp(r'/series/([A-Z0-9]{26})').firstMatch(url);
+    return match?.group(1);
+  }
+
+  String? _extractChapterId(String url) {
+    final match = RegExp(r'/chapters/([A-Z0-9]{26})').firstMatch(url);
+    return match?.group(1);
+  }
+
+  // ── Browse / Search ─────────────────────────────────────────────────
+
+  Future<List<Manga>> getManga({int page = 1, String? tag, bool allowAdult = false}) async {
     try {
-      var url = '$_baseUrl/manga?order[views_30d]=desc&genres_mode=and&limit=28&page=$page';
-      if (genreId != null) {
-        url = '$_baseUrl/manga?order[views_30d]=desc&genres[]=$genreId&genres_mode=and&limit=28&page=$page';
+      final offset = (page - 1) * _pageSize;
+      final adult = allowAdult ? 'Any' : 'False';
+      var url =
+          '$_baseUrl/search/data?text=&display_mode=Full+Display&sort=Popularity&order=Descending&official=Any&adult=$adult&offset=$offset';
+      if (tag != null) {
+        url += '&included_tag=${Uri.encodeComponent(tag)}';
       }
       debugPrint('[MangaService] Fetching page $page: $url');
-      final response = await http.get(Uri.parse(url), headers: _headers);
-
-      debugPrint('[MangaService] Response status: ${response.statusCode}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        debugPrint('[MangaService] Response data status: ${data['status']}');
-        if (data['status'] == 200 && data['result'] != null) {
-          final items = data['result']['items'] as List;
-          debugPrint('[MangaService] Found ${items.length} manga items');
-          return items.map((item) => Manga.fromJson(item)).toList();
-        } else {
-          debugPrint('[MangaService] Invalid response structure: ${data.toString().substring(0, 200)}');
-        }
-      }
+      final html = await _fetchHtml(url);
+      return _parseSearchResults(html);
     } catch (e) {
       debugPrint('[MangaService] Error fetching manga: $e');
+      return [];
     }
-    return [];
   }
 
-  Future<List<Manga>> searchManga(String query, {int page = 1}) async {
+  Future<List<Manga>> searchManga(String query, {int page = 1, bool allowAdult = false}) async {
     try {
+      final offset = (page - 1) * _pageSize;
+      final adult = allowAdult ? 'Any' : 'False';
       final encodedQuery = Uri.encodeComponent(query);
-      final url = '$_baseUrl/manga?order[relevance]=desc&keyword=$encodedQuery&genres_mode=and&limit=28&page=$page';
+      final url =
+          '$_baseUrl/search/data?text=$encodedQuery&display_mode=Full+Display&sort=Best+Match&order=Descending&official=Any&adult=$adult&offset=$offset';
       debugPrint('[MangaService] Searching page $page: $url');
-      final response = await http.get(Uri.parse(url), headers: _headers);
-
-      debugPrint('[MangaService] Search response status: ${response.statusCode}');
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        debugPrint('[MangaService] Search response data status: ${data['status']}');
-        if (data['status'] == 200 && data['result'] != null) {
-          final items = data['result']['items'] as List;
-          debugPrint('[MangaService] Found ${items.length} search results');
-          return items.map((item) => Manga.fromJson(item)).toList();
-        } else {
-          debugPrint('[MangaService] Invalid search response structure');
-        }
-      }
+      final html = await _fetchHtml(url);
+      return _parseSearchResults(html);
     } catch (e) {
       debugPrint('[MangaService] Error searching manga: $e');
+      return [];
     }
-    return [];
   }
 
-  Future<List<MangaChapter>> getChapters(String hashId) async {
-    final List<MangaChapter> allChapters = [];
-    int page = 1;
-    
-    while (true) {
-      try {
-        final url = '$_baseUrl/manga/$hashId/chapters?limit=100&page=$page&order[number]=desc';
-        debugPrint('[MangaService] Fetching chapters page $page: $url');
-        final response = await http.get(Uri.parse(url), headers: _headers);
+  List<Manga> _parseSearchResults(String html) {
+    final doc = html_parser.parse(html);
+    final articles = doc.querySelectorAll('article');
+    final results = <Manga>[];
 
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data['status'] == 200 && data['result'] != null) {
-            final items = data['result']['items'] as List;
-            if (items.isEmpty) {
-              debugPrint('[MangaService] No more chapters, total: ${allChapters.length}');
-              break;
-            }
-            allChapters.addAll(items.map((item) => MangaChapter.fromJson(item)));
-            debugPrint('[MangaService] Fetched ${items.length} chapters from page $page');
-            page++;
-          } else {
-            break;
-          }
-        } else {
+    for (final article in articles) {
+      final seriesLink = article.querySelector('a[href*="/series/"]');
+      if (seriesLink == null) continue;
+
+      final href = seriesLink.attributes['href'] ?? '';
+      final seriesId = _extractSeriesId(href);
+      if (seriesId == null) continue;
+
+      // Title: img alt stripped of " cover", or .truncate text, or link text
+      String title = '';
+      final img = article.querySelector('img');
+      final alt = img?.attributes['alt'] ?? '';
+      if (alt.endsWith(' cover')) {
+        title = alt.substring(0, alt.length - 6);
+      }
+      if (title.isEmpty) {
+        title = article.querySelector('.truncate')?.text.trim() ??
+            article.querySelector('.line-clamp-1')?.text.trim() ??
+            seriesLink.text.trim().split('\n').first.trim();
+      }
+
+      // Type from tooltip data-tip matching known types
+      String type = '';
+      for (final el in article.querySelectorAll('[data-tip]')) {
+        final tip = el.attributes['data-tip'] ?? '';
+        if (['Manga', 'Manhwa', 'Manhua', 'OEL'].contains(tip)) {
+          type = tip;
           break;
         }
-      } catch (e) {
-        debugPrint('[MangaService] Error fetching chapters: $e');
+      }
+
+      results.add(Manga(
+        id: seriesId,
+        title: title,
+        coverSmall: '$_coverCdn/small/$seriesId.webp',
+        coverNormal: '$_coverCdn/normal/$seriesId.webp',
+        type: type,
+        url: href,
+      ));
+    }
+
+    return results;
+  }
+
+  // ── Series Detail ───────────────────────────────────────────────────
+
+  Future<Manga> getSeriesDetail(String seriesId) async {
+    final html = await _fetchHtml('$_baseUrl/series/$seriesId');
+    final doc = html_parser.parse(html);
+
+    final title = doc.querySelector('h1')?.text.trim() ?? '';
+
+    // Parse details from <li> items with <strong> labels
+    final details = <String, List<String>>{};
+    for (final li in doc.querySelectorAll('li')) {
+      final strong = li.querySelector('strong');
+      if (strong == null) continue;
+      final label =
+          strong.text.trim().replaceAll(':', '').replaceAll('(s)', '');
+      final links = li.querySelectorAll('a');
+      final spans = li.querySelectorAll('span');
+      if (links.isNotEmpty) {
+        details[label] = links
+            .map((a) => a.text.trim())
+            .where((t) => t.isNotEmpty)
+            .toList();
+      } else if (spans.isNotEmpty) {
+        details[label] = spans
+            .map((s) => s.text.trim())
+            .where((t) => t.isNotEmpty)
+            .toList();
+      }
+    }
+
+    // Synopsis: first <p> with substantial text
+    String synopsis = '';
+    for (final p in doc.querySelectorAll('p')) {
+      final text = p.text.trim();
+      if (text.length > 50 &&
+          !text.contains('Copyright') &&
+          !text.contains('verified')) {
+        synopsis = text;
         break;
       }
     }
-    
-    return allChapters;
+
+    return Manga(
+      id: seriesId,
+      title: title,
+      coverSmall: '$_coverCdn/small/$seriesId.webp',
+      coverNormal: '$_coverCdn/normal/$seriesId.webp',
+      type: (details['Type'] ?? ['']).first,
+      status: (details['Status'] ?? ['']).first,
+      year: (details['Released'] ?? ['']).first,
+      author: (details['Author'] ?? []).join(', '),
+      tags: details['Tag'] ?? [],
+      synopsis: synopsis,
+      url: '/series/$seriesId',
+    );
   }
 
-  Future<List<String>> getChapterImages(String hashId, String slug, int chapterId, double chapterNumber) async {
+  // ── Chapters ────────────────────────────────────────────────────────
+
+  Future<List<MangaChapter>> getChapters(String seriesId) async {
     try {
-      final url = 'https://comix.to/title/$hashId-$slug/$chapterId-chapter-${chapterNumber.toInt()}';
-      debugPrint('[MangaService] Fetching chapter page: $url');
-      
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-        },
-      );
+      final html =
+          await _fetchHtml('$_baseUrl/series/$seriesId/full-chapter-list');
+      final doc = html_parser.parse(html);
 
-      debugPrint('[MangaService] Response status: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        final html = response.body;
-        final imageUrls = <String>[];
-        
-        // Find all self.__next_f.push calls
-        final scriptPattern = RegExp(r'self\.__next_f\.push\(\[1,"((?:[^"\\]|\\.)*)"\]\)', multiLine: true, dotAll: true);
-        final scriptMatches = scriptPattern.allMatches(html);
-        
-        for (final match in scriptMatches) {
-          if (match.group(1) != null) {
-            String encoded = match.group(1)!;
-            
-            // Decode the escaped string
-            String decoded = encoded
-                .replaceAll(r'\"', '"')
-                .replaceAll(r'\n', '\n')
-                .replaceAll(r'\\', r'\');
-            
-            // Only look for .webp images
-            if (decoded.contains('.webp')) {
-              final imgPattern = RegExp(r'https://[^\s"\\]+\.webp', multiLine: true);
-              final imgMatches = imgPattern.allMatches(decoded);
-              
-              for (final imgMatch in imgMatches) {
-                final imgUrl = imgMatch.group(0)!;
-                if (!imageUrls.contains(imgUrl)) {
-                  imageUrls.add(imgUrl);
-                }
-              }
-            }
+      final chapters = <MangaChapter>[];
+      final links = doc.querySelectorAll('a[href*="/chapters/"]');
+
+      for (final a in links) {
+        final href = a.attributes['href'] ?? '';
+        final chapterId = _extractChapterId(href);
+        if (chapterId == null) continue;
+
+        String chapterName = '';
+        for (final span in a.querySelectorAll('span')) {
+          final t = span.text.trim();
+          if (t.isNotEmpty &&
+              !t.contains('{') &&
+              !t.contains('.st0') &&
+              !t.contains('fill:')) {
+            chapterName = t;
+            break;
           }
         }
-        
-        // If we found at least one webp image, construct the rest
-        if (imageUrls.isNotEmpty) {
-          final firstImage = imageUrls.first;
-          debugPrint('[MangaService] First webp image: $firstImage');
-          
-          // Extract the base URL and pattern
-          // Example: https://ek10.wowpic1.store/ii/bEqPbYfoOT0GmkXlQmqftDpIwoUNV/1.webp
-          final match = RegExp(r'(https://[^/]+/[^/]+/[^/]+/)(\d+)(\.webp)').firstMatch(firstImage);
-          
-          if (match != null) {
-            final baseUrl = match.group(1)!;
-            final firstPageNum = match.group(2)!;
-            final extension = match.group(3)!;
-            
-            // Determine if padding is used (01 vs 1)
-            final usesPadding = firstPageNum.length > 1 && firstPageNum.startsWith('0');
-            
-            // Count how many images we found to determine total pages
-            final pageCount = imageUrls.length;
-            debugPrint('[MangaService] Constructing $pageCount pages from base: $baseUrl (padding: $usesPadding)');
-            
-            // Construct all page URLs and proxy them
-            final constructedUrls = <String>[];
-            for (int i = 1; i <= pageCount; i++) {
-              final pageNum = usesPadding ? i.toString().padLeft(2, '0') : i.toString();
-              final imageUrl = '$baseUrl$pageNum$extension';
-              // Proxy the URL through local server to add referer header
-              final proxiedUrl = LocalServerService().getMangaProxyUrl(imageUrl);
-              constructedUrls.add(proxiedUrl);
-            }
-            
-            debugPrint('[MangaService] Total images constructed: ${constructedUrls.length}');
-            return constructedUrls;
-          }
+
+        if (chapterName.isNotEmpty) {
+          chapters.add(MangaChapter.fromRaw(chapterId, chapterName, href));
         }
-        
-        debugPrint('[MangaService] No webp images found');
-      } else {
-        debugPrint('[MangaService] HTTP error: ${response.statusCode}');
       }
-    } catch (e, stackTrace) {
-      debugPrint('[MangaService] Error fetching chapter images: $e');
-      debugPrint('[MangaService] Stack trace: $stackTrace');
+
+      debugPrint('[MangaService] Found ${chapters.length} chapters');
+      return chapters;
+    } catch (e) {
+      debugPrint('[MangaService] Error fetching chapters: $e');
+      return [];
     }
-    return [];
   }
 
-  // Like Functionality
+  // ── Chapter Images ──────────────────────────────────────────────────
+
+  Future<List<String>> getChapterImages(String chapterId) async {
+    try {
+      final url =
+          '$_baseUrl/chapters/$chapterId/images?is_prev=False&current_page=1&reading_style=long_strip';
+      final html = await _fetchHtml(url);
+      final doc = html_parser.parse(html);
+
+      final images = <String>[];
+      for (final img in doc.querySelectorAll('img')) {
+        final src = img.attributes['src'] ?? '';
+        if (src.isNotEmpty &&
+            !src.contains('/static/') &&
+            !src.contains('brand')) {
+          images.add(src);
+        }
+      }
+
+      debugPrint('[MangaService] Found ${images.length} chapter images');
+      return images;
+    } catch (e) {
+      debugPrint('[MangaService] Error fetching chapter images: $e');
+      return [];
+    }
+  }
+
+  // ── Like Functionality ──────────────────────────────────────────────
+
   Future<void> toggleLike(Manga manga) async {
     final prefs = await SharedPreferences.getInstance();
     final likedJson = prefs.getStringList(_likedKey) ?? [];
-    
-    final index = likedJson.indexWhere((j) => Manga.fromJson(jsonDecode(j)).hashId == manga.hashId);
-    
+
+    final index = likedJson.indexWhere((j) {
+      final m = jsonDecode(j) as Map<String, dynamic>;
+      return m['id'] == manga.id;
+    });
+
     if (index != -1) {
       likedJson.removeAt(index);
     } else {
       likedJson.add(jsonEncode(manga.toJson()));
     }
-    
+
     await prefs.setStringList(_likedKey, likedJson);
   }
 
-  Future<bool> isLiked(String hashId) async {
+  Future<bool> isLiked(String id) async {
     final prefs = await SharedPreferences.getInstance();
     final likedJson = prefs.getStringList(_likedKey) ?? [];
-    return likedJson.any((j) => Manga.fromJson(jsonDecode(j)).hashId == hashId);
+    return likedJson.any((j) {
+      final m = jsonDecode(j) as Map<String, dynamic>;
+      return m['id'] == id;
+    });
   }
 
   Future<List<Manga>> getLikedManga() async {
@@ -433,4 +402,48 @@ class MangaService {
     final likedJson = prefs.getStringList(_likedKey) ?? [];
     return likedJson.map((j) => Manga.fromJson(jsonDecode(j))).toList();
   }
+
+  // ── Available Tags ──────────────────────────────────────────────────
+
+  static const List<String> availableTags = [
+    'Action',
+    'Adventure',
+    'Comedy',
+    'Cooking',
+    'Doujinshi',
+    'Drama',
+    'Ecchi',
+    'Fantasy',
+    'Gender Bender',
+    'Harem',
+    'Historical',
+    'Horror',
+    'Isekai',
+    'Josei',
+    'Lolicon',
+    'Martial Arts',
+    'Mature',
+    'Mecha',
+    'Medical',
+    'Music',
+    'Mystery',
+    'One Shot',
+    'Psychological',
+    'Romance',
+    'School Life',
+    'Sci-Fi',
+    'Seinen',
+    'Shotacon',
+    'Shoujo',
+    'Shoujo Ai',
+    'Shounen',
+    'Shounen Ai',
+    'Slice of Life',
+    'Smut',
+    'Sports',
+    'Supernatural',
+    'Tragedy',
+    'Yaoi',
+    'Yuri',
+  ];
 }

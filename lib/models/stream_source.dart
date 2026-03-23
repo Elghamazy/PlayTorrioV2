@@ -2,11 +2,13 @@ class StreamSource {
   final String url;
   final String title;
   final String type;
+  final Map<String, String>? headers;
   
   StreamSource({
     required this.url,
     required this.title,
     required this.type,
+    this.headers,
   });
   
   factory StreamSource.fromJson(Map<String, dynamic> json) {

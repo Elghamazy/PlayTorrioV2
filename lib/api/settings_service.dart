@@ -199,4 +199,37 @@ class SettingsService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_torrentRamCacheMbKey, mb);
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Navbar Configuration
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  static const String _navbarConfigKey = 'navbar_config';
+
+  /// Notifier that fires when navbar config changes so MainScreen rebuilds.
+  static final ValueNotifier<int> navbarChangeNotifier = ValueNotifier<int>(0);
+
+  /// All available nav items in default order. 'settings' is always last and locked.
+  static const List<String> allNavIds = [
+    'home', 'discover', 'search', 'mylist', 'magnet', 'live_matches',
+    'iptv', 'audiobooks', 'books', 'music', 'comics', 'manga',
+    'jellyfin', 'anime', 'arabic',
+  ];
+
+  /// Returns the ordered list of visible nav item IDs.
+  /// Settings is NOT stored — it's always appended by the consumer.
+  Future<List<String>> getNavbarConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_navbarConfigKey);
+    if (raw == null) return List.from(allNavIds); // default: all visible
+    // Filter out any stale IDs that no longer exist
+    return raw.where((id) => allNavIds.contains(id)).toList();
+  }
+
+  /// Save the ordered list of visible nav item IDs (excluding 'settings').
+  Future<void> setNavbarConfig(List<String> visibleIds) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_navbarConfigKey, visibleIds);
+    navbarChangeNotifier.value++;
+  }
 }

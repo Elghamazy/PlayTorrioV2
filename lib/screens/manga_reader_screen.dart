@@ -132,21 +132,7 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
       'manga': widget.manga.toJson(),
       'chapterIndex': _currentChapterIndex,
       'pageIndex': _currentPageIndex,
-      'chapters': widget.chapters.map((c) => {
-        'chapterId': c.chapterId,
-        'mangaId': c.mangaId,
-        'number': c.number,
-        'name': c.name,
-        'language': c.language,
-        'volume': c.volume,
-        'votes': c.votes,
-        'createdAt': c.createdAt,
-        'scanlation_group': {
-          'scanlation_group_id': c.scanlationGroup.scanlationGroupId,
-          'name': c.scanlationGroup.name,
-          'slug': c.scanlationGroup.slug,
-        },
-      }).toList(),
+      'chapters': widget.chapters.map((c) => c.toJson()).toList(),
       'timestamp': DateTime.now().toIso8601String(),
     };
 
@@ -154,7 +140,7 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
     final history = historyJson.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
     
     // Remove existing entry for this manga
-    history.removeWhere((h) => h['manga']['hash_id'] == widget.manga.hashId);
+    history.removeWhere((h) => h['manga']['id'] == widget.manga.id);
     
     // Add new entry at the beginning
     history.insert(0, progress);
@@ -206,12 +192,7 @@ class _MangaReaderScreenState extends State<MangaReaderScreen> {
     
     final chapter = widget.chapters[_currentChapterIndex];
     debugPrint('[MangaReader] Loading chapter ${chapter.number}');
-    final images = await _mangaService.getChapterImages(
-      widget.manga.hashId,
-      widget.manga.slug,
-      chapter.chapterId,
-      chapter.number,
-    );
+    final images = await _mangaService.getChapterImages(chapter.id);
     
     debugPrint('[MangaReader] Received ${images.length} images');
     if (images.isNotEmpty) {

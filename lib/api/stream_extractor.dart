@@ -228,10 +228,16 @@ class StreamExtractor {
             rUrl.contains('master') ||
             rUrl.contains('.mpd') ||
             rUrl.contains('manifest') ||
-            rUrl.contains('heistotron.uk/p/')) &&
+            rUrl.contains('heistotron.uk/p/') ||
+            // VK CDN direct video URLs (no file extension, query-string based)
+            // Exclude API init requests (appId=, asubs=) — only match actual video sources
+            (rUrl.contains('okcdn.ru/') && rUrl.contains('type=') && !rUrl.contains('bytes=') && !rUrl.contains('appId=')) ||
+            (rUrl.contains('vkuser.net/') && rUrl.contains('type=') && !rUrl.contains('bytes=') && !rUrl.contains('appId='))) &&
         !rUrl.contains('google')) {
 
-       if (rUrl.contains('/audio/') || rUrl.contains('audio_')) {
+       // Check audio only in the URL path (not query params)
+       final pathOnly = Uri.tryParse(rUrl)?.path ?? rUrl;
+       if (pathOnly.contains('/audio/') || pathOnly.contains('audio_')) {
           debugPrint('[StreamExtractor] AUDIO DETECTED: $rUrl');
           _capturedAudio = rUrl;
           // ✅ FIX: was `headers` (undefined getter) — now builds the map correctly

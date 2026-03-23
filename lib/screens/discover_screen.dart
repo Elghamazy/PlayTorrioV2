@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/tmdb_api.dart';
@@ -182,92 +183,88 @@ class _DiscoverScreenState extends State<DiscoverScreen> with AutomaticKeepAlive
   }
 
   void _showTypeMenu() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: AppTheme.bgCard,
-      builder: (context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildTypeTile("All"),
-          _buildTypeTile("Movies"),
-          _buildTypeTile("TV Shows"),
-        ],
+      barrierColor: Colors.black54,
+      builder: (context) => _CompactFilterDialog(
+        title: 'Content Type',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: ['All', 'Movies', 'TV Shows'].map((type) {
+            final isSelected = _selectedType == type;
+            return ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              title: Text(type, style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal, fontSize: 14)),
+              trailing: isSelected ? const Icon(Icons.check_circle, color: AppTheme.primaryColor, size: 20) : null,
+              onTap: () {
+                setState(() { _selectedType = type; _currentPage = 1; });
+                Navigator.pop(context);
+                _loadData();
+              },
+            );
+          }).toList(),
+        ),
       ),
     );
   }
 
-  Widget _buildTypeTile(String type) {
-    return ListTile(
-      title: Text(type, style: const TextStyle(color: Colors.white)),
-      trailing: _selectedType == type ? const Icon(Icons.check, color: AppTheme.primaryColor) : null,
-      onTap: () {
-        setState(() {
-          _selectedType = type;
-          _currentPage = 1;
-        });
-        Navigator.pop(context);
-        _loadData();
-      },
-    );
-  }
-
   void _showGenreMenu() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: AppTheme.bgCard,
-      isScrollControlled: true,
+      barrierColor: Colors.black54,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
-            return DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.6,
-              maxChildSize: 0.9,
-              builder: (context, scrollController) {
-                return ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    const Text("Select Genres", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _allGenreNames.map((name) {
-                        final isSelected = _selectedGenreNames.contains(name);
-                        return FilterChip(
-                          label: Text(name),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            setModalState(() {
-                              if (selected) {
-                                _selectedGenreNames.add(name);
-                              } else {
-                                _selectedGenreNames.remove(name);
-                              }
-                            });
-                          },
-                          backgroundColor: Colors.white10,
-                          selectedColor: AppTheme.primaryColor,
-                          checkmarkColor: Colors.white,
-                          labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.white70),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide.none),
-                        );
-                      }).toList(),
+          builder: (context, setDialogState) {
+            return _CompactFilterDialog(
+              title: 'Select Genres',
+              maxHeight: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _allGenreNames.map((name) {
+                          final isSelected = _selectedGenreNames.contains(name);
+                          return FilterChip(
+                            label: Text(name, style: const TextStyle(fontSize: 12)),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setDialogState(() {
+                                if (selected) { _selectedGenreNames.add(name); } else { _selectedGenreNames.remove(name); }
+                              });
+                            },
+                            backgroundColor: Colors.white.withValues(alpha: 0.08),
+                            selectedColor: AppTheme.primaryColor,
+                            checkmarkColor: Colors.white,
+                            labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.white70),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide.none),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          );
+                        }).toList(),
+                      ),
                     ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context);
                         setState(() => _currentPage = 1);
                         _loadData();
                       },
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
-                      child: const Text("Apply", style: TextStyle(color: Colors.white)),
-                    )
-                  ],
-                );
-              },
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, padding: const EdgeInsets.symmetric(vertical: 10)),
+                      child: const Text("Apply", style: TextStyle(color: Colors.white, fontSize: 13)),
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
@@ -279,61 +276,60 @@ class _DiscoverScreenState extends State<DiscoverScreen> with AutomaticKeepAlive
     final currentYear = DateTime.now().year;
     final years = List.generate(100, (index) => currentYear - index);
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: AppTheme.bgCard,
-      isScrollControlled: true,
+      barrierColor: Colors.black54,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
-            return DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.6,
-              maxChildSize: 0.9,
-              builder: (context, scrollController) {
-                return ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    const Text("Select Years", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: years.map((y) {
-                        final isSelected = _selectedYears.contains(y);
-                        return FilterChip(
-                          label: Text(y.toString()),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            setModalState(() {
-                              if (selected) {
-                                _selectedYears.add(y);
-                              } else {
-                                _selectedYears.remove(y);
-                              }
-                            });
-                          },
-                          backgroundColor: Colors.white10,
-                          selectedColor: AppTheme.primaryColor,
-                          labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.white70),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide.none),
-                        );
-                      }).toList(),
+          builder: (context, setDialogState) {
+            return _CompactFilterDialog(
+              title: 'Select Years',
+              maxHeight: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: years.map((y) {
+                          final isSelected = _selectedYears.contains(y);
+                          return FilterChip(
+                            label: Text(y.toString(), style: const TextStyle(fontSize: 12)),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setDialogState(() {
+                                if (selected) { _selectedYears.add(y); } else { _selectedYears.remove(y); }
+                              });
+                            },
+                            backgroundColor: Colors.white.withValues(alpha: 0.08),
+                            selectedColor: AppTheme.primaryColor,
+                            labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.white70),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide.none),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          );
+                        }).toList(),
+                      ),
                     ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context);
                         setState(() => _currentPage = 1);
                         _loadData();
                       },
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
-                      child: const Text("Apply", style: TextStyle(color: Colors.white)),
-                    )
-                  ],
-                );
-              },
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, padding: const EdgeInsets.symmetric(vertical: 10)),
+                      child: const Text("Apply", style: TextStyle(color: Colors.white, fontSize: 13)),
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
@@ -342,72 +338,73 @@ class _DiscoverScreenState extends State<DiscoverScreen> with AutomaticKeepAlive
   }
 
   void _showLanguageMenu() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: AppTheme.bgCard,
-      isScrollControlled: true,
+      barrierColor: Colors.black54,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
-            return DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.6,
-              maxChildSize: 0.9,
-              builder: (context, scrollController) {
-                final languages = _languageMap.keys.toList();
-                return ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    const Text("Select Language", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        FilterChip(
-                          label: const Text('Any'),
-                          selected: _selectedLanguage == null,
-                          onSelected: (_) {
-                            setModalState(() => _selectedLanguage = null);
-                          },
-                          backgroundColor: Colors.white10,
-                          selectedColor: AppTheme.primaryColor,
-                          checkmarkColor: Colors.white,
-                          labelStyle: TextStyle(color: _selectedLanguage == null ? Colors.white : Colors.white70),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide.none),
-                        ),
-                        ...languages.map((name) {
-                          final code = _languageMap[name]!;
-                          final isSelected = _selectedLanguage == code;
-                          return FilterChip(
-                            label: Text(name),
-                            selected: isSelected,
-                            onSelected: (_) {
-                              setModalState(() => _selectedLanguage = isSelected ? null : code);
-                            },
-                            backgroundColor: Colors.white10,
+          builder: (context, setDialogState) {
+            final languages = _languageMap.keys.toList();
+            return _CompactFilterDialog(
+              title: 'Select Language',
+              maxHeight: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          FilterChip(
+                            label: const Text('Any', style: TextStyle(fontSize: 12)),
+                            selected: _selectedLanguage == null,
+                            onSelected: (_) => setDialogState(() => _selectedLanguage = null),
+                            backgroundColor: Colors.white.withValues(alpha: 0.08),
                             selectedColor: AppTheme.primaryColor,
                             checkmarkColor: Colors.white,
-                            labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.white70),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide.none),
-                          );
-                        }),
-                      ],
+                            labelStyle: TextStyle(color: _selectedLanguage == null ? Colors.white : Colors.white70),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide.none),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          ...languages.map((name) {
+                            final code = _languageMap[name]!;
+                            final isSelected = _selectedLanguage == code;
+                            return FilterChip(
+                              label: Text(name, style: const TextStyle(fontSize: 12)),
+                              selected: isSelected,
+                              onSelected: (_) => setDialogState(() => _selectedLanguage = isSelected ? null : code),
+                              backgroundColor: Colors.white.withValues(alpha: 0.08),
+                              selectedColor: AppTheme.primaryColor,
+                              checkmarkColor: Colors.white,
+                              labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.white70),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide.none),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            );
+                          }),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context);
                         setState(() => _currentPage = 1);
                         _loadData();
                       },
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
-                      child: const Text("Apply", style: TextStyle(color: Colors.white)),
-                    )
-                  ],
-                );
-              },
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, padding: const EdgeInsets.symmetric(vertical: 10)),
+                      child: const Text("Apply", style: TextStyle(color: Colors.white, fontSize: 13)),
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
@@ -418,46 +415,60 @@ class _DiscoverScreenState extends State<DiscoverScreen> with AutomaticKeepAlive
   void _showRatingMenu() {
     showDialog(
       context: context,
+      barrierColor: Colors.black54,
       builder: (context) {
         double localRating = _minRating;
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: AppTheme.bgCard,
-              title: const Text("Minimum Rating", style: TextStyle(color: Colors.white)),
-              content: Column(
+            return _CompactFilterDialog(
+              title: 'Minimum Rating',
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text("${localRating.toStringAsFixed(1)}+ ⭐", style: const TextStyle(color: Colors.amber, fontSize: 24, fontWeight: FontWeight.bold)),
-                  Slider(
-                    value: localRating,
-                    min: 0,
-                    max: 9,
-                    divisions: 9,
-                    thumbColor: AppTheme.primaryColor,
-                    onChanged: (v) => setDialogState(() => localRating = v),
+                  Text("${localRating.toStringAsFixed(1)}+", style: const TextStyle(color: Colors.amber, fontSize: 28, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  SliderTheme(
+                    data: SliderThemeData(
+                      activeTrackColor: AppTheme.primaryColor,
+                      inactiveTrackColor: Colors.white12,
+                      thumbColor: AppTheme.primaryColor,
+                      overlayColor: AppTheme.primaryColor.withValues(alpha: 0.15),
+                    ),
+                    child: Slider(
+                      value: localRating,
+                      min: 0,
+                      max: 9,
+                      divisions: 9,
+                      onChanged: (v) => setDialogState(() => localRating = v),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text("Cancel", style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() { _minRating = localRating; _currentPage = 1; });
+                            Navigator.pop(context);
+                            _loadData();
+                          },
+                          style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor, padding: const EdgeInsets.symmetric(vertical: 10)),
+                          child: const Text("Apply", style: TextStyle(color: Colors.white, fontSize: 13)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancel"),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _minRating = localRating;
-                      _currentPage = 1;
-                    });
-                    Navigator.pop(context);
-                    _loadData();
-                  },
-                  child: const Text("Apply", style: TextStyle(color: AppTheme.primaryColor)),
-                ),
-              ],
             );
-          }
+          },
         );
       },
     );
@@ -578,6 +589,65 @@ class _FilterButton extends StatelessWidget {
         labelStyle: TextStyle(color: isActive ? Colors.white : Colors.white70, fontWeight: isActive ? FontWeight.bold : FontWeight.normal),
         side: BorderSide.none,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+    );
+  }
+}
+
+class _CompactFilterDialog extends StatelessWidget {
+  final String title;
+  final Widget child;
+  final double? maxHeight;
+
+  const _CompactFilterDialog({required this.title, required this.child, this.maxHeight});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 32),
+        constraints: BoxConstraints(maxWidth: 380, maxHeight: maxHeight ?? 500),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.bgCard.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 30, spreadRadius: -5)],
+                ),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
+                            child: const Icon(Icons.close, color: Colors.white54, size: 18),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    child,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

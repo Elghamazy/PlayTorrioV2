@@ -21,11 +21,15 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
   List<MangaChapter> _chapters = [];
   int _currentChapterPage = 0;
   static const int _chaptersPerPage = 20;
+  Manga? _fullManga;
+
+  Manga get _manga => _fullManga ?? widget.manga;
 
   @override
   void initState() {
     super.initState();
     _loadLikedStatus();
+    _loadDetails();
     _loadChapters();
   }
 
@@ -36,14 +40,23 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
   }
 
   Future<void> _loadLikedStatus() async {
-    final liked = await _mangaService.isLiked(widget.manga.hashId);
+    final liked = await _mangaService.isLiked(widget.manga.id);
     if (mounted) {
       setState(() => _isLiked = liked);
     }
   }
 
+  Future<void> _loadDetails() async {
+    try {
+      final detail = await _mangaService.getSeriesDetail(widget.manga.id);
+      if (mounted) setState(() => _fullManga = detail);
+    } catch (e) {
+      debugPrint('[MangaDetails] Error loading details: $e');
+    }
+  }
+
   Future<void> _loadChapters() async {
-    final chapters = await _mangaService.getChapters(widget.manga.hashId);
+    final chapters = await _mangaService.getChapters(widget.manga.id);
     if (mounted) {
       setState(() {
         _chapters = chapters;
@@ -105,7 +118,7 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
         onPressed: () => Navigator.pop(context),
       ),
       title: Text(
-        widget.manga.title,
+        _manga.title,
         style: const TextStyle(color: Colors.white, fontSize: 16),
       ),
       actions: [
@@ -127,7 +140,7 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
         ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: CachedNetworkImage(
-            imageUrl: widget.manga.poster.large,
+            imageUrl: _manga.coverNormal,
             width: 120,
             height: 180,
             fit: BoxFit.cover,
@@ -145,7 +158,7 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.manga.title,
+                _manga.title,
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -153,11 +166,10 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              _buildMetaItem(Icons.star, 'Rating', '${widget.manga.ratedAvg} / 10', color: AppTheme.primaryColor),
-              _buildMetaItem(Icons.calendar_today, 'Year', '${widget.manga.startDate}'),
-              _buildMetaItem(Icons.category, 'Type', widget.manga.type.toUpperCase()),
-              _buildMetaItem(Icons.info_outline, 'Status', widget.manga.status.toUpperCase(), color: AppTheme.primaryColor),
-              _buildMetaItem(Icons.menu_book, 'Chapters', '${widget.manga.latestChapter.toInt()}'),
+              _buildMetaItem(Icons.calendar_today, 'Year', _manga.year),
+              _buildMetaItem(Icons.category, 'Type', _manga.type.toUpperCase()),
+              _buildMetaItem(Icons.info_outline, 'Status', _manga.status.toUpperCase(), color: AppTheme.primaryColor),
+              _buildMetaItem(Icons.person, 'Author', _manga.author),
             ],
           ),
         ),
@@ -202,7 +214,7 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          widget.manga.synopsis,
+          _manga.synopsis,
           style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.5),
         ),
       ],
@@ -308,17 +320,19 @@ class _MangaDetailsScreenState extends State<MangaDetailsScreen> {
                 chapterTitle,
                 style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
               ),
-              subtitle: Text(
-                chapter.scanlationGroup.name,
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
-              ),
+              subtitle: chapter.name.isNotEmpty
+                  ? Text(
+                      chapter.name,
+                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    )
+                  : null,
               trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 14),
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => MangaReaderScreen(
-                      manga: widget.manga,
+                      manga: _manga,
                       chapters: _chapters,
                       currentChapterIndex: actualIndex,
                     ),

@@ -21,7 +21,7 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   
   List<Manga> _manga = [];
-  List<String> _likedHashIds = [];
+  List<String> _likedIds = [];
   List<Map<String, dynamic>> _history = [];
   bool _isLoading = true;
   bool _isShowingLiked = false;
@@ -29,41 +29,8 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
   String _searchQuery = '';
   int _currentPage = 1;
   String? _selectedGenre;
-  int? _selectedGenreId;
   bool _isGenreDropdownOpen = false;
-  
-  final Map<String, int> _genres = {
-    'Action': 6,
-    'Adult': 87264,
-    'Adventure': 7,
-    'Boys Love': 8,
-    'Comedy': 9,
-    'Crime': 10,
-    'Drama': 11,
-    'Ecchi': 87265,
-    'Fantasy': 12,
-    'Girls Love': 13,
-    'Hentai': 87266,
-    'Historical': 14,
-    'Horror': 15,
-    'Isekai': 16,
-    'Magical Girls': 17,
-    'Mature': 87267,
-    'Mecha': 18,
-    'Medical': 19,
-    'Mystery': 20,
-    'Philosophical': 21,
-    'Psychological': 22,
-    'Romance': 23,
-    'Sci-Fi': 24,
-    'Slice of Life': 25,
-    'Smut': 87268,
-    'Sports': 26,
-    'Superhero': 27,
-    'Thriller': 28,
-    'Tragedy': 29,
-    'Wuxia': 30,
-  };
+  bool _allowAdult = false;
 
   @override
   void initState() {
@@ -97,7 +64,7 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
     final liked = await _mangaService.getLikedManga();
     if (mounted) {
       setState(() {
-        _likedHashIds = liked.map((m) => m.hashId).toList();
+        _likedIds = liked.map((m) => m.id).toList();
       });
     }
   }
@@ -131,12 +98,12 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
     ).then((_) => _loadHistory());
   }
 
-  void _removeFromHistory(String hashId) async {
+  void _removeFromHistory(String id) async {
     final prefs = await SharedPreferences.getInstance();
     final historyJson = prefs.getStringList('manga_reading_history') ?? [];
     final history = historyJson.map((e) => jsonDecode(e) as Map<String, dynamic>).toList();
     
-    history.removeWhere((h) => h['manga']['hash_id'] == hashId);
+    history.removeWhere((h) => h['manga']['id'] == id);
     
     await prefs.setStringList('manga_reading_history', history.map((e) => jsonEncode(e)).toList());
     _loadHistory();
@@ -148,7 +115,7 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
       _isShowingLiked = false;
       _isSearching = false;
     });
-    final manga = await _mangaService.getManga(page: _currentPage, genreId: _selectedGenreId);
+    final manga = await _mangaService.getManga(page: _currentPage, tag: _selectedGenre, allowAdult: _allowAdult);
     setState(() {
       _manga = manga;
       _isLoading = false;
@@ -171,7 +138,7 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
       _currentPage = 1;
     });
     
-    final results = await _mangaService.searchManga(query, page: _currentPage);
+    final results = await _mangaService.searchManga(query, page: _currentPage, allowAdult: _allowAdult);
     setState(() {
       _manga = results;
       _isLoading = false;
@@ -183,7 +150,7 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
     if (!_isSearching || _searchQuery.isEmpty) return;
     
     setState(() => _isLoading = true);
-    final results = await _mangaService.searchManga(_searchQuery, page: _currentPage);
+    final results = await _mangaService.searchManga(_searchQuery, page: _currentPage, allowAdult: _allowAdult);
     setState(() {
       _manga = results;
       _isLoading = false;
@@ -357,6 +324,49 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
           ),
           const SizedBox(width: 12),
           _buildGenreDropdown(),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              setState(() => _allowAdult = !_allowAdult);
+              if (_isSearching) {
+                _searchManga(_searchQuery);
+              } else {
+                _fetchManga();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: _allowAdult
+                    ? AppTheme.primaryColor.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: _allowAdult ? AppTheme.primaryColor : Colors.transparent,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _allowAdult ? Icons.check_box : Icons.check_box_outline_blank,
+                    color: _allowAdult ? AppTheme.primaryColor : Colors.white54,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '18+',
+                    style: TextStyle(
+                      color: _allowAdult ? AppTheme.primaryColor : Colors.white54,
+                      fontSize: 13,
+                      fontWeight: _allowAdult ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -439,7 +449,6 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
                     onTap: () {
                       setState(() {
                         _selectedGenre = null;
-                        _selectedGenreId = null;
                         _isGenreDropdownOpen = false;
                         _currentPage = 1; // Reset to page 1
                       });
@@ -462,16 +471,15 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
             child: ListView.builder(
               shrinkWrap: true,
               padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: _genres.length,
+              itemCount: MangaService.availableTags.length,
               itemBuilder: (context, index) {
-                final genre = _genres.keys.elementAt(index);
+                final genre = MangaService.availableTags[index];
                 final isSelected = _selectedGenre == genre;
                 
                 return InkWell(
                   onTap: () {
                     setState(() {
                       _selectedGenre = genre;
-                      _selectedGenreId = _genres[genre];
                       _isGenreDropdownOpen = false;
                       _currentPage = 1; // Reset to page 1 when changing genre
                     });
@@ -580,7 +588,7 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
         itemCount: _manga.length,
         itemBuilder: (context, index) {
           final manga = _manga[index];
-          final isLiked = _likedHashIds.contains(manga.hashId);
+          final isLiked = _likedIds.contains(manga.id);
           return _MangaCard(
             manga: manga,
             isLiked: isLiked,
@@ -647,7 +655,7 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: CachedNetworkImage(
-                                imageUrl: manga.poster.medium,
+                                imageUrl: manga.coverNormal,
                                 width: 60,
                                 height: 90,
                                 fit: BoxFit.cover,
@@ -706,7 +714,7 @@ class _MangaScreenState extends State<MangaScreen> with WidgetsBindingObserver {
                       top: 4,
                       right: 4,
                       child: GestureDetector(
-                        onTap: () => _removeFromHistory(manga.hashId),
+                        onTap: () => _removeFromHistory(manga.id),
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: const BoxDecoration(
@@ -805,7 +813,7 @@ class _MangaCardState extends State<_MangaCard> {
                 children: [
                   Expanded(
                     child: CachedNetworkImage(
-                      imageUrl: widget.manga.poster.large,
+                      imageUrl: widget.manga.coverNormal,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       placeholder: (context, url) => Container(color: Colors.white10),

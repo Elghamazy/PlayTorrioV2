@@ -13,10 +13,13 @@ import 'books_screen.dart';
 import 'comics_screen.dart';
 import 'manga_screen.dart';
 import 'jellyfin_screen.dart';
+import 'anime_screen.dart';
+import 'arabic_screen.dart';
 import 'live_matches_screen.dart';
 import 'magnet_player_screen.dart';
 import '../features/iptv/screens/iptv_login_screen.dart';
 import '../utils/app_theme.dart';
+import '../api/settings_service.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -36,30 +39,72 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
 
-  // Cache screens so they are NOT recreated on every build/orientation change
-  late final List<Widget> _cachedScreens;
+  /// All screens keyed by nav ID — created once, never recreated.
+  late final Map<String, Widget> _allScreens;
+
+  /// Nav item metadata keyed by nav ID.
+  static const Map<String, Map<String, dynamic>> _navMeta = {
+    'home':         {'icon': Icons.home_outlined,              'active': Icons.home,                    'label': 'Home'},
+    'discover':     {'icon': Icons.explore_outlined,            'active': Icons.explore,                 'label': 'Discover'},
+    'search':       {'icon': Icons.search,                      'active': Icons.search,                  'label': 'Search'},
+    'mylist':       {'icon': Icons.bookmark_outline,            'active': Icons.bookmark,                'label': 'My List'},
+    'magnet':       {'icon': Icons.link_rounded,                'active': Icons.link_rounded,            'label': 'Magnet'},
+    'live_matches': {'icon': Icons.sports_soccer_outlined,      'active': Icons.sports_soccer_rounded,   'label': 'Live Matches'},
+    'iptv':         {'icon': Icons.live_tv_outlined,            'active': Icons.live_tv,                 'label': 'IPTV'},
+    'audiobooks':   {'icon': Icons.menu_book_outlined,          'active': Icons.menu_book,               'label': 'Audiobooks'},
+    'books':        {'icon': Icons.import_contacts_rounded,     'active': Icons.import_contacts_rounded, 'label': 'Books'},
+    'music':        {'icon': Icons.music_note_outlined,         'active': Icons.music_note,              'label': 'Music'},
+    'comics':       {'icon': Icons.auto_stories_outlined,       'active': Icons.auto_stories,            'label': 'Comics'},
+    'manga':        {'icon': Icons.book_outlined,               'active': Icons.book,                    'label': 'Manga'},
+    'jellyfin':     {'icon': Icons.dns_outlined,                'active': Icons.dns_rounded,             'label': 'Jellyfin'},
+    'anime':        {'icon': Icons.play_circle_outline,         'active': Icons.play_circle_filled,      'label': 'Anime'},
+    'arabic':       {'icon': Icons.movie_filter_outlined,       'active': Icons.movie_filter,            'label': 'Arabic'},
+    'settings':     {'icon': Icons.settings_outlined,           'active': Icons.settings,                'label': 'Settings'},
+  };
+
+  /// Currently visible nav IDs (always ends with 'settings').
+  List<String> _visibleIds = [...SettingsService.allNavIds, 'settings'];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     MainScreen.stremioSearchNotifier.addListener(_onStremioSearch);
-    _cachedScreens = [
-      const HomeScreen(),
-      const DiscoverScreen(),
-      const SearchScreen(),
-      const MyListScreen(),
-      const MagnetPlayerScreen(),
-      const LiveMatchesScreen(),
-      const IptvLoginScreen(),
-      const AudiobookScreen(),
-      const BooksScreen(),
-      const MusicScreen(),
-      ComicsScreen(initialSearch: null),
-      MangaScreen(initialSearch: null),
-      const JellyfinScreen(),
-      const SettingsScreen(),
-    ];
+    SettingsService.navbarChangeNotifier.addListener(_onNavbarConfigChanged);
+
+    _allScreens = {
+      'home':         const HomeScreen(),
+      'discover':     const DiscoverScreen(),
+      'search':       const SearchScreen(),
+      'mylist':       const MyListScreen(),
+      'magnet':       const MagnetPlayerScreen(),
+      'live_matches': const LiveMatchesScreen(),
+      'iptv':         const IptvLoginScreen(),
+      'audiobooks':   const AudiobookScreen(),
+      'books':        const BooksScreen(),
+      'music':        const MusicScreen(),
+      'comics':       ComicsScreen(initialSearch: null),
+      'manga':        MangaScreen(initialSearch: null),
+      'jellyfin':     const JellyfinScreen(),
+      'anime':        const AnimeScreen(),
+      'arabic':       const ArabicScreen(),
+      'settings':     const SettingsScreen(),
+    };
+
+    _loadNavbarConfig();
+  }
+
+  Future<void> _loadNavbarConfig() async {
+    final visible = await SettingsService().getNavbarConfig();
+    if (!mounted) return;
+    setState(() {
+      _visibleIds = [...visible, 'settings'];
+      if (_selectedIndex >= _visibleIds.length) _selectedIndex = 0;
+    });
+  }
+
+  void _onNavbarConfigChanged() {
+    _loadNavbarConfig();
   }
 
   /// Re-apply immersive mode after metrics changes settle (rotation, etc.).
@@ -82,32 +127,29 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void _onStremioSearch() {
     final data = MainScreen.stremioSearchNotifier.value;
     if (data == null || (data['query'] ?? '').isEmpty) return;
-    setState(() => _selectedIndex = 2);
+    final idx = _visibleIds.indexOf('search');
+    if (idx != -1) setState(() => _selectedIndex = idx);
   }
 
   void _onItemTapped(int index) {
-    setState(() { 
-      _selectedIndex = index;
-      // Indices: 0=Home 1=Discover 2=Search 3=MyList 4=Magnet 5=LiveMatches 6=IPTV 7=Audiobooks 8=Books 9=Music 10=Comics 11=Manga 12=Jellyfin 13=Settings
-    });
+    setState(() => _selectedIndex = index);
   }
 
   void searchComics(String query) {
-    setState(() {
-      _selectedIndex = 10;
-    });
+    final idx = _visibleIds.indexOf('comics');
+    if (idx != -1) setState(() => _selectedIndex = idx);
   }
 
   void searchManga(String query) {
-    setState(() {
-      _selectedIndex = 11;
-    });
+    final idx = _visibleIds.indexOf('manga');
+    if (idx != -1) setState(() => _selectedIndex = idx);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     MainScreen.stremioSearchNotifier.removeListener(_onStremioSearch);
+    SettingsService.navbarChangeNotifier.removeListener(_onNavbarConfigChanged);
     super.dispose();
   }
 
@@ -208,78 +250,14 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                               size: 48,
                             ),
                           ),
-                          destinations: const [
-                            NavigationRailDestination(
-                              icon: Icon(Icons.home_outlined, color: Colors.white54),
-                              selectedIcon: Icon(Icons.home, color: Colors.white),
-                              label: Text('Home'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.explore_outlined, color: Colors.white54),
-                              selectedIcon: Icon(Icons.explore, color: Colors.white),
-                              label: Text('Discover'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.search, color: Colors.white54),
-                              selectedIcon: Icon(Icons.search, color: Colors.white),
-                              label: Text('Search'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.bookmark_outline, color: Colors.white54),
-                              selectedIcon: Icon(Icons.bookmark, color: Colors.white),
-                              label: Text('My List'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.link_rounded, color: Colors.white54),
-                              selectedIcon: Icon(Icons.link_rounded, color: Colors.white),
-                              label: Text('Magnet'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.sports_soccer_outlined, color: Colors.white54),
-                              selectedIcon: Icon(Icons.sports_soccer_rounded, color: Colors.white),
-                              label: Text('Live Matches'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.live_tv_outlined, color: Colors.white54),
-                              selectedIcon: Icon(Icons.live_tv, color: Colors.white),
-                              label: Text('IPTV'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.menu_book_outlined, color: Colors.white54),
-                              selectedIcon: Icon(Icons.menu_book, color: Colors.white),
-                              label: Text('Audiobooks'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.import_contacts_rounded, color: Colors.white54),
-                              selectedIcon: Icon(Icons.import_contacts_rounded, color: Colors.white),
-                              label: Text('Books'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.music_note_outlined, color: Colors.white54),
-                              selectedIcon: Icon(Icons.music_note, color: Colors.white),
-                              label: Text('Music'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.auto_stories_outlined, color: Colors.white54),
-                              selectedIcon: Icon(Icons.auto_stories, color: Colors.white),
-                              label: Text('Comics'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.book_outlined, color: Colors.white54),
-                              selectedIcon: Icon(Icons.book, color: Colors.white),
-                              label: Text('Manga'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.dns_outlined, color: Colors.white54),
-                              selectedIcon: Icon(Icons.dns_rounded, color: Colors.white),
-                              label: Text('Jellyfin'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.settings_outlined, color: Colors.white54),
-                              selectedIcon: Icon(Icons.settings, color: Colors.white),
-                              label: Text('Settings'),
-                            ),
-                          ],
+                          destinations: _visibleIds.map((id) {
+                            final meta = _navMeta[id]!;
+                            return NavigationRailDestination(
+                              icon: Icon(meta['icon'] as IconData, color: Colors.white54),
+                              selectedIcon: Icon(meta['active'] as IconData, color: Colors.white),
+                              label: Text(meta['label'] as String),
+                            );
+                          }).toList(),
                         ),
                       ),
                     ),
@@ -288,7 +266,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             Expanded(
               child: IndexedStack(
                 index: _selectedIndex,
-                children: _cachedScreens,
+                children: _visibleIds.map((id) => _allScreens[id]!).toList(),
               ),
             ),
           ],
@@ -302,23 +280,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildScrollableBottomNav() {
-    final List<Map<String, dynamic>> items = [
-      {'icon': Icons.home_outlined, 'active': Icons.home, 'label': 'Home'},
-      {'icon': Icons.explore_outlined, 'active': Icons.explore, 'label': 'Discover'},
-      {'icon': Icons.search, 'active': Icons.search, 'label': 'Search'},
-      {'icon': Icons.bookmark_outline, 'active': Icons.bookmark, 'label': 'My List'},
-      {'icon': Icons.link_rounded, 'active': Icons.link_rounded, 'label': 'Magnet'},
-      {'icon': Icons.sports_soccer_outlined, 'active': Icons.sports_soccer_rounded, 'label': 'Live Matches'},
-      {'icon': Icons.live_tv_outlined, 'active': Icons.live_tv, 'label': 'IPTV'},
-      {'icon': Icons.menu_book_outlined, 'active': Icons.menu_book, 'label': 'Audiobooks'},
-      {'icon': Icons.import_contacts_rounded, 'active': Icons.import_contacts_rounded, 'label': 'Books'},
-      {'icon': Icons.music_note_outlined, 'active': Icons.music_note, 'label': 'Music'},
-      {'icon': Icons.auto_stories_outlined, 'active': Icons.auto_stories, 'label': 'Comics'},
-      {'icon': Icons.book_outlined, 'active': Icons.book, 'label': 'Manga'},
-      {'icon': Icons.dns_outlined, 'active': Icons.dns_rounded, 'label': 'Jellyfin'},
-      {'icon': Icons.settings_outlined, 'active': Icons.settings, 'label': 'Settings'},
-    ];
-
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
@@ -334,9 +295,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             child: Row(
-              children: items.asMap().entries.map((entry) {
+              children: _visibleIds.asMap().entries.map((entry) {
                 final int idx = entry.key;
-                final Map<String, dynamic> item = entry.value;
+                final String id = entry.value;
+                final meta = _navMeta[id]!;
                 final bool isSelected = _selectedIndex == idx;
 
                 return InkWell(
@@ -355,13 +317,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Icon(
-                            isSelected ? item['active'] : item['icon'],
+                            isSelected ? meta['active'] as IconData : meta['icon'] as IconData,
                             color: isSelected ? Colors.white : Colors.white54,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          item['label'],
+                          meta['label'] as String,
                           style: TextStyle(
                             color: isSelected ? Colors.white : Colors.white54,
                             fontSize: 11,

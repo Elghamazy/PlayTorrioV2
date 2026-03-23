@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -9,10 +10,12 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../api/subtitle_api.dart';
 import '../../services/watch_history_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../api/trakt_service.dart';
 import '../../api/torrent_stream_service.dart';
 import '../../api/stream_extractor.dart';
 import '../../api/webstreamr_service.dart';
+import '../../api/arabic_service.dart';
 import '../../api/stremio_service.dart';
 import '../../api/stream_providers.dart';
 import '../../api/settings_service.dart';
@@ -468,6 +471,7 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen>
   String? _currentUrl;
   int _currentFallbackSourceIndex = 0;
   bool _isSwitchingProvider = false;
+  bool _isInitPlaybackRunning = false;
   bool _isFetchingSubs = false;
   String? _selectedExternalSubUrl;
 
@@ -631,9 +635,17 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen>
   }
 
   void _saveWatchHistory() {
-    if (widget.movie == null) return;
     final pos = _positionNotifier.value.inMilliseconds;
     final dur = _durationNotifier.value.inMilliseconds;
+
+    // Save anime watch position
+    if (widget.activeProvider != null &&
+        widget.activeProvider!.startsWith('anime_') &&
+        pos > 10000 && dur > 0) {
+      _saveAnimeWatchPosition(pos, dur);
+    }
+
+    if (widget.movie == null) return;
     if (pos > 10000 && dur > 0) {
       final isTorrent = widget.magnetLink != null;
       final isStremioDirect = widget.activeProvider == 'stremio_direct';
@@ -690,13 +702,34 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen>
     }
   }
 
+  void _saveAnimeWatchPosition(int posMs, int durMs) {
+    SharedPreferences.getInstance().then((prefs) {
+      final list = prefs.getStringList('anime_watch_history') ?? [];
+      for (int i = 0; i < list.length; i++) {
+        final entry = jsonDecode(list[i]) as Map<String, dynamic>;
+        // Match by title which contains the anime name + episode
+        // The most recent entry (index 0) is the one currently playing
+        if (i == 0) {
+          entry['position'] = posMs;
+          entry['duration'] = durMs;
+          list[i] = jsonEncode(entry);
+          prefs.setStringList('anime_watch_history', list);
+          break;
+        }
+      }
+    });
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   //  PLAYBACK INITIALIZATION
   // ─────────────────────────────────────────────────────────────────────────
 
   Future<void> _initPlayback() async {
     if (_disposed) return;
+    if (_isInitPlaybackRunning) return; // Prevent re-entrant calls during async extraction
+    _isInitPlaybackRunning = true;
     
+    try {
     setState(() {
       _hasError = false;
       _errorMessage = '';
@@ -706,13 +739,37 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen>
     if (_currentSources != null && _currentSources!.isNotEmpty) {
       while (_currentFallbackSourceIndex < _currentSources!.length) {
         final i = _currentFallbackSourceIndex;
-        final source = _currentSources![i];
+        var source = _currentSources![i];
         debugPrint('[Player] Trying source ${i + 1}/${_currentSources!.length}: ${source.title}');
+
+        // Arabic embed sources need on-demand extraction first
+        if (_currentProvider == 'arabic' && source.type == 'arabic_embed') {
+          debugPrint('[Player] Extracting arabic embed: ${source.title}');
+          final result = await ArabicService.extractStreamUrl(source.url);
+          if (result == null) {
+            debugPrint('[Player] Arabic extract failed for ${source.title}');
+            _currentFallbackSourceIndex++;
+            continue;
+          }
+          // Update the source with the real stream URL
+          source = StreamSource(
+            url: result.url,
+            title: source.title,
+            type: result.url.contains('.m3u8') ? 'hls' : result.url.contains('.mpd') ? 'dash' : 'mp4',
+          );
+          _currentSources![i] = source;
+        }
         
         try {
           _subscribeToStreams();
           await _configureMpvProperties();
-          await _player.open(Media(source.url, httpHeaders: widget.headers));
+          final srcHeaders = source.headers ?? widget.headers;
+          await _player.open(Media(source.url, httpHeaders: srcHeaders));
+          // Update mpv referrer for this specific source
+          if (source.headers != null && _player.platform is NativePlayer) {
+            final ref = source.headers!['Referer'] ?? source.headers!['referer'];
+            if (ref != null) await (_player.platform as NativePlayer).setProperty('referrer', ref);
+          }
           _player.setVolume(_volume);
           setState(() {
             _currentUrl = source.url;
@@ -747,6 +804,9 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen>
           await Future.delayed(Duration(milliseconds: 500 * retryCount));
         }
       }
+    }
+    } finally {
+      _isInitPlaybackRunning = false;
     }
   }
 
@@ -911,15 +971,20 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen>
     // Surface only fatal errors — transient network blips are handled by mpv
     _errorSub = _player.stream.error.listen((err) {
       if (_disposed || err.isEmpty) return;
-      debugPrint('🔴 [MobilePlayer] $err');
       
-      // Ignore audio decoder errors (user can switch to alternate audio track)
-      if (err.contains('Failed to initialize a decoder for codec')) {
-        debugPrint('⚠️ Audio codec not supported, continuing with video only');
+      // Ignore non-fatal audio errors (video continues playing)
+      if (err.contains('Error decoding audio') ||
+          err.contains('Failed to initialize a decoder for codec')) {
         return;
       }
       
+      debugPrint('🔴 [MobilePlayer] $err');
+      
       if (err.contains('Failed') || err.contains('No such file')) {
+        if (_isInitPlaybackRunning) {
+          debugPrint('[Player] Ignoring stale error — _initPlayback already running');
+          return;
+        }
         debugPrint('[Player] Fatal error detected on source $_currentFallbackSourceIndex, progressing fallback...');
         _currentFallbackSourceIndex++;
         _initPlayback();
@@ -965,6 +1030,10 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen>
     // which is unreliable on Android and drains battery unnecessarily.
     // audio sync gives smooth playback tied to the audio clock instead.
     await mpv.setProperty('video-sync', 'audio');
+
+    // ── Adaptive Streaming (HLS/DASH) ─────────────────────────────────────
+    // Always pick the highest bitrate variant in multi-quality playlists.
+    await mpv.setProperty('hls-bitrate', 'max');
 
     // ── Network / Cache ───────────────────────────────────────────────────
     await mpv.setProperty('network-timeout', '30');
@@ -1564,18 +1633,55 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen>
                       // Save current position
                       final currentPos = _positionNotifier.value;
                       final messenger = ScaffoldMessenger.of(context);
-                      
-                      // Switch to new source
-                      await _player.open(
-                        Media(source.url, httpHeaders: widget.headers),
-                      );
 
-                      setState(() {
-                        _currentUrl = source.url;
-                        _currentFallbackSourceIndex = 0; // Reset index on manual selection
-                        _hasError = false;
-                        _errorMessage = '';
-                      });
+                      // Arabic provider: extract on-demand from embed URL
+                      if (_currentProvider == 'arabic' && source.type == 'arabic_embed') {
+                        messenger.showSnackBar(SnackBar(
+                          content: Text('Extracting ${source.title}...'),
+                          duration: const Duration(seconds: 30),
+                        ));
+                        final result = await ArabicService.extractStreamUrl(source.url);
+                        if (!mounted) return;
+                        messenger.hideCurrentSnackBar();
+                        if (result == null) {
+                          messenger.showSnackBar(SnackBar(
+                            content: Text('Failed to extract ${source.title}'),
+                            duration: const Duration(seconds: 2),
+                          ));
+                          return;
+                        }
+                        await _player.open(
+                          Media(result.url, httpHeaders: result.headers),
+                        );
+                        // Update the source entry with the extracted stream URL
+                        _currentSources![index] = StreamSource(
+                          url: result.url,
+                          title: source.title,
+                          type: result.url.contains('.m3u8') ? 'hls' : result.url.contains('.mpd') ? 'dash' : 'mp4',
+                        );
+                        setState(() {
+                          _currentUrl = result.url;
+                          _currentFallbackSourceIndex = 0;
+                          _hasError = false;
+                          _errorMessage = '';
+                        });
+                      } else {
+                        // Normal direct switch — use per-source headers if available
+                        final srcHeaders = source.headers ?? widget.headers;
+                        if (source.headers != null && _player.platform is NativePlayer) {
+                          final ref = source.headers!['Referer'] ?? source.headers!['referer'];
+                          if (ref != null) await (_player.platform as NativePlayer).setProperty('referrer', ref);
+                        }
+                        await _player.open(
+                          Media(source.url, httpHeaders: srcHeaders),
+                        );
+                        setState(() {
+                          _currentUrl = source.url;
+                          _currentFallbackSourceIndex = 0;
+                          _hasError = false;
+                          _errorMessage = '';
+                        });
+                      }
                       
                       // Seek to saved position
                       if (currentPos.inSeconds > 0) {
@@ -2296,6 +2402,13 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen>
                     text: 'Retry',
                     onTap: _initPlayback,
                   ),
+                  if (_currentProvider == 'arabic' && _currentSources != null && _currentSources!.isNotEmpty) ...[
+                    const SizedBox(width: 12),
+                    _GlassPillButton(
+                      text: 'Switch Source',
+                      onTap: _showSourcesMenu,
+                    ),
+                  ],
                   const SizedBox(width: 12),
                   _GlassPillButton(
                     text: 'Switch Provider',
@@ -2374,8 +2487,8 @@ class _MobilePlayerScreenState extends State<MobilePlayerScreen>
                 onPressed: _showSubtitlesMenu,
                 size: btnSize, iconSize: iconSz,
               ),
-              // Show sources button only for Amri or WebStreamr provider
-              if ((_currentProvider == 'amri' || _currentProvider == 'webstreamr') && _currentSources != null && _currentSources!.isNotEmpty) ...[
+              // Show sources button for providers with multiple sources
+              if ((_currentProvider == 'amri' || _currentProvider == 'webstreamr' || _currentProvider == 'arabic') && _currentSources != null && _currentSources!.isNotEmpty) ...[
                 SizedBox(width: gap),
                 _GlassIconButton(
                   icon: Icons.video_library_outlined,

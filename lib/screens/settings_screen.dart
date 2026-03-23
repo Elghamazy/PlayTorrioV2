@@ -70,6 +70,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _torrentCacheType = 'ram';
   int _torrentRamCacheMb = 200;
 
+  // Navbar config
+  List<String> _navbarVisible = [];
+  List<String> _navbarOrder = [];
+
   @override
   void initState() {
     super.initState();
@@ -106,6 +110,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final cacheType = await _settings.getTorrentCacheType();
     final ramCacheMb = await _settings.getTorrentRamCacheMb();
 
+    // Load navbar config
+    final navVisible = await _settings.getNavbarConfig();
+    // Full order: visible items first, then hidden items
+    final allIds = SettingsService.allNavIds;
+    final hidden = allIds.where((id) => !navVisible.contains(id)).toList();
+    final navOrder = [...navVisible, ...hidden];
+
     if (mounted) {
       setState(() {
         _isStreamingMode = streaming;
@@ -130,6 +141,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _prowlarrApiKeyController.text = prowlarrKey ?? '';
         _torrentCacheType = cacheType;
         _torrentRamCacheMb = ramCacheMb;
+        _navbarVisible = navVisible;
+        _navbarOrder = navOrder;
       });
     }
   }
@@ -369,10 +382,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 32),
                     _buildSectionHeader('App Updates'),
                     _buildUpdateChecker(),
+                    const SizedBox(height: 32),
+                    _buildSectionHeader('Navigation Bar'),
+                    _buildNavbarConfig(),
                     const SizedBox(height: 64),
                     const Center(
                       child: Text(
-                        'PlayTorrio Native v1.0.4',
+                        'PlayTorrio Native v1.0.5',
                         style: TextStyle(color: Colors.white24, fontSize: 12, letterSpacing: 2, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -399,6 +415,149 @@ class _SettingsScreenState extends State<SettingsScreen> {
           letterSpacing: 2,
         ),
       ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Navbar Configuration
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  static const Map<String, Map<String, dynamic>> _navMeta = {
+    'home':         {'icon': Icons.home,                       'label': 'Home'},
+    'discover':     {'icon': Icons.explore,                    'label': 'Discover'},
+    'search':       {'icon': Icons.search,                     'label': 'Search'},
+    'mylist':       {'icon': Icons.bookmark,                   'label': 'My List'},
+    'magnet':       {'icon': Icons.link_rounded,               'label': 'Magnet'},
+    'live_matches': {'icon': Icons.sports_soccer_rounded,      'label': 'Live Matches'},
+    'iptv':         {'icon': Icons.live_tv,                    'label': 'IPTV'},
+    'audiobooks':   {'icon': Icons.menu_book,                  'label': 'Audiobooks'},
+    'books':        {'icon': Icons.import_contacts_rounded,    'label': 'Books'},
+    'music':        {'icon': Icons.music_note,                 'label': 'Music'},
+    'comics':       {'icon': Icons.auto_stories,               'label': 'Comics'},
+    'manga':        {'icon': Icons.book,                       'label': 'Manga'},
+    'jellyfin':     {'icon': Icons.dns_rounded,                'label': 'Jellyfin'},
+    'anime':        {'icon': Icons.play_circle_filled,         'label': 'Anime'},
+    'arabic':       {'icon': Icons.movie_filter,               'label': 'Arabic'},
+  };
+
+  void _saveNavbarConfig() {
+    final visible = _navbarOrder.where((id) => _navbarVisible.contains(id)).toList();
+    _settings.setNavbarConfig(visible);
+  }
+
+  Widget _buildNavbarConfig() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Show, hide, and reorder navigation tabs. Drag to reorder. Settings is always visible.',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
+          ),
+        ),
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          itemCount: _navbarOrder.length,
+          proxyDecorator: (child, index, animation) {
+            return Material(
+              color: Colors.transparent,
+              child: child,
+            );
+          },
+          onReorder: (oldIndex, newIndex) {
+            setState(() {
+              if (newIndex > oldIndex) newIndex--;
+              final item = _navbarOrder.removeAt(oldIndex);
+              _navbarOrder.insert(newIndex, item);
+            });
+            _saveNavbarConfig();
+          },
+          itemBuilder: (context, index) {
+            final id = _navbarOrder[index];
+            final meta = _navMeta[id]!;
+            final isVisible = _navbarVisible.contains(id);
+
+            return Container(
+              key: ValueKey(id),
+              margin: const EdgeInsets.only(bottom: 2),
+              decoration: BoxDecoration(
+                color: isVisible
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.white.withValues(alpha: 0.02),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ListTile(
+                leading: Icon(
+                  meta['icon'] as IconData,
+                  color: isVisible ? Colors.white : Colors.white24,
+                  size: 22,
+                ),
+                title: Text(
+                  meta['label'] as String,
+                  style: TextStyle(
+                    color: isVisible ? Colors.white : Colors.white38,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Switch(
+                      value: isVisible,
+                      activeTrackColor: AppTheme.primaryColor,
+                      onChanged: (val) {
+                        setState(() {
+                          if (val) {
+                            _navbarVisible.add(id);
+                          } else {
+                            _navbarVisible.remove(id);
+                          }
+                        });
+                        _saveNavbarConfig();
+                      },
+                    ),
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: const Padding(
+                        padding: EdgeInsets.only(left: 4),
+                        child: Icon(Icons.drag_handle, color: Colors.white24, size: 20),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        // Settings row — always visible, not reorderable
+        Container(
+          margin: const EdgeInsets.only(top: 2),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.3)),
+          ),
+          child: ListTile(
+            leading: const Icon(Icons.settings, color: AppTheme.primaryColor, size: 22),
+            title: const Text(
+              'Settings',
+              style: TextStyle(color: AppTheme.primaryColor, fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_outline, color: Colors.white.withValues(alpha: 0.2), size: 16),
+                const SizedBox(width: 8),
+                Text('Always visible', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 11)),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
