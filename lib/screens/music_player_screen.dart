@@ -225,7 +225,11 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with WidgetsBindi
                                 duration: const Duration(milliseconds: 350),
                                 switchInCurve: Curves.easeOutCubic,
                                 switchOutCurve: Curves.easeInCubic,
-                                child: _buildCurrentView(track, availableWidth),
+                                child: LayoutBuilder(
+                          builder: (context, innerConstraints) {
+                            return _buildCurrentView(track, availableWidth, innerConstraints.maxHeight);
+                          },
+                        ),
                               ),
                             ),
                             _buildPlayerControls(track),
@@ -300,10 +304,10 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with WidgetsBindi
     );
   }
 
-  Widget _buildCurrentView(MusicTrack track, double availableWidth) {
+  Widget _buildCurrentView(MusicTrack track, double availableWidth, [double? availableHeight]) {
     switch (_currentView) {
       case PlayerView.art:
-        return _buildArtView(track, availableWidth);
+        return _buildArtView(track, availableWidth, availableHeight);
       case PlayerView.lyrics:
         return _buildLyricsView();
       case PlayerView.related:
@@ -315,8 +319,10 @@ class _MusicPlayerScreenState extends State<MusicPlayerScreen> with WidgetsBindi
   //  ART VIEW
   // ─────────────────────────────────────────────
 
-  Widget _buildArtView(MusicTrack track, double availableWidth) {
-    final artSize = (availableWidth * 0.82).clamp(180.0, 360.0);
+  Widget _buildArtView(MusicTrack track, double availableWidth, [double? availableHeight]) {
+    // Reserve ~120px for title/artist/album text + spacing
+    final maxArtFromHeight = (availableHeight != null) ? (availableHeight - 120).clamp(100.0, 360.0) : 360.0;
+    final artSize = (availableWidth * 0.82).clamp(180.0, maxArtFromHeight);
 
     return Column(
       key: const ValueKey('art'),

@@ -152,26 +152,21 @@ class MusicPlayerService {
         }
       }
 
-      // 2. YouTube Match
+      // 2. YouTube Match (cached + runs in background isolate)
       final videoId = await _musicService.getYoutubeVideoId(track.title, track.artist);
       if (videoId == null) {
         debugPrint('MusicPlayerService: No YouTube match');
         return;
       }
 
-      // 3. Manifest
-      final manifest = await _musicService.getYoutubeManifest(videoId);
-      if (manifest == null) {
-        debugPrint('MusicPlayerService: Failed manifest');
+      // 3. Stream URL (cached + runs in background isolate)
+      final streamUrl = await _musicService.getYoutubeStreamUrl(videoId);
+      if (streamUrl == null) {
+        debugPrint('MusicPlayerService: Failed to get stream URL');
         return;
       }
 
-      // SELECT HIGHEST BITRATE MANUALLY
-      final audioStreams = manifest.audioOnly.toList();
-      audioStreams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
-      final streamUri = audioStreams.first.url;
-
-      await _player.open(Media(streamUri.toString()));
+      await _player.open(Media(streamUrl));
       _prefetchNext();
       
     } catch (e) {
@@ -213,7 +208,11 @@ class MusicPlayerService {
     if (playlist.value.isEmpty || _currentIndex == -1) return;
     final nextIndex = (_currentIndex + 1) % playlist.value.length;
     final nextTrack = playlist.value[nextIndex];
-    await _musicService.getYoutubeVideoId(nextTrack.title, nextTrack.artist);
+    // Prefetch both video ID and stream URL so next track plays instantly
+    final videoId = await _musicService.getYoutubeVideoId(nextTrack.title, nextTrack.artist);
+    if (videoId != null) {
+      await _musicService.getYoutubeStreamUrl(videoId);
+    }
   }
 
   void play() => _player.play();

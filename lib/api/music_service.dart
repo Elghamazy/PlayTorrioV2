@@ -1,7 +1,15 @@
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+
+class _CachedUrl {
+  final String url;
+  final DateTime cachedAt;
+  _CachedUrl(this.url) : cachedAt = DateTime.now();
+  bool get isExpired => DateTime.now().difference(cachedAt).inHours >= 5;
+}
 
 class MusicTrack {
   final String id;
@@ -106,6 +114,10 @@ class MusicService {
   final _yt = YoutubeExplode();
   static const String _proxyUrl = 'https://deezer-proxy.aymanisthedude1.workers.dev/?url=';
 
+  // Caches for fast playback
+  final Map<String, String> _videoIdCache = {};
+  final Map<String, _CachedUrl> _streamUrlCache = {};
+
   Future<List<MusicTrack>> searchTracks(String query) async {
     try {
       // Use Uri to properly encode non-ASCII characters (Arabic, etc.)
@@ -208,29 +220,78 @@ class MusicService {
   }
 
   Future<String?> getYoutubeVideoId(String title, String artist) async {
+    final cacheKey = '$title|$artist';
+    if (_videoIdCache.containsKey(cacheKey)) {
+      debugPrint('MusicService: Video ID cache hit for "$title"');
+      return _videoIdCache[cacheKey];
+    }
+
     try {
-      final searchQuery = '$title - $artist (Official Audio)';
-      final searchList = await _yt.search.search(searchQuery);
-      
-      if (searchList.isNotEmpty) {
-        for (final video in searchList) {
-          if (video.duration != null && video.duration!.inSeconds > 60) {
-            return video.id.value;
+      final videoId = await Isolate.run(() async {
+        final yt = YoutubeExplode();
+        try {
+          final searchQuery = '$title - $artist (Official Audio)';
+          final searchList = await yt.search.search(searchQuery);
+          if (searchList.isNotEmpty) {
+            for (final video in searchList) {
+              if (video.duration != null && video.duration!.inSeconds > 60) {
+                return video.id.value;
+              }
+            }
+            return searchList.first.id.value;
           }
+        } finally {
+          yt.close();
         }
-        return searchList.first.id.value;
-      }
+        return null;
+      });
+
+      if (videoId != null) _videoIdCache[cacheKey] = videoId;
+      return videoId;
     } catch (e) {
       debugPrint('MusicService: YouTube matching error: $e');
     }
     return null;
   }
 
+  /// Fast stream URL fetching for playback — runs in isolate with caching
+  Future<String?> getYoutubeStreamUrl(String videoId) async {
+    final cached = _streamUrlCache[videoId];
+    if (cached != null && !cached.isExpired) {
+      debugPrint('MusicService: Stream URL cache hit');
+      return cached.url;
+    }
+
+    try {
+      final url = await Isolate.run(() async {
+        final yt = YoutubeExplode();
+        try {
+          final manifest = await yt.videos.streamsClient.getManifest(
+            videoId,
+            ytClients: [YoutubeApiClient.androidVr],
+          );
+          final audioStreams = manifest.audioOnly.toList();
+          if (audioStreams.isEmpty) return null;
+          audioStreams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+          return audioStreams.first.url.toString();
+        } finally {
+          yt.close();
+        }
+      });
+
+      if (url != null) _streamUrlCache[videoId] = _CachedUrl(url);
+      return url;
+    } catch (e) {
+      debugPrint('MusicService: Stream URL error: $e');
+      return null;
+    }
+  }
+
   Future<StreamManifest?> getYoutubeManifest(String videoId) async {
     try {
       return await _yt.videos.streamsClient.getManifest(
         videoId,
-        ytClients: [YoutubeApiClient.androidVr, YoutubeApiClient.android, YoutubeApiClient.ios],
+        ytClients: [YoutubeApiClient.androidVr],
       );
     } catch (e) {
       debugPrint('MusicService: Get manifest error: $e');
