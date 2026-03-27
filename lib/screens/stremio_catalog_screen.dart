@@ -282,10 +282,14 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
       children: [
         // Left sidebar — catalog list
         Container(
-          width: 280,
-          decoration: const BoxDecoration(
-            color: AppTheme.bgCard,
-            border: Border(right: BorderSide(color: Colors.white10)),
+          width: 300,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1A1A2E), Color(0xFF0D0D16)],
+            ),
+            border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
           ),
           child: Column(
             children: [
@@ -303,20 +307,24 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
 
   Widget _buildSidebarHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 48, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 16, 20, 16),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.04))),
+      ),
+      child: Row(
         children: [
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white70),
-                onPressed: () => Navigator.pop(context),
-              ),
-              const SizedBox(width: 8),
-              const Text('Catalogs', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-            ],
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 18),
+              onPressed: () => Navigator.pop(context),
+            ),
           ),
+          const SizedBox(width: 14),
+          const Text('Catalogs', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
         ],
       ),
     );
@@ -324,13 +332,13 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
 
   Widget _buildTypeFilter() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
       child: Row(
         children: [
           _buildFilterChip('All', 'all'),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           _buildFilterChip('Movies', 'movie'),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           _buildFilterChip('Series', 'series'),
         ],
       ),
@@ -344,21 +352,18 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
         onTap: () => setState(() => _filterType = type),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? AppTheme.primaryColor.withValues(alpha: 0.2) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: selected ? AppTheme.primaryColor : Colors.white12,
-            ),
+            color: selected ? AppTheme.primaryColor : Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: selected ? AppTheme.primaryColor : Colors.white54,
-              fontSize: 12,
-              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              color: selected ? Colors.white : Colors.white54,
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
         ),
@@ -376,11 +381,11 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
     }
 
     return ListView(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       children: [
         for (final entry in grouped.entries) ...[
           Padding(
-            padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
+            padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
             child: Row(
               children: [
                 if ((entry.value.first['addonIcon'] ?? '').toString().isNotEmpty)
@@ -418,23 +423,33 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
         _selectedCatalog!['catalogType'] == cat['catalogType'];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
       child: Material(
-        color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.15) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.12) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           onTap: () => _selectCatalog(cat),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                Icon(
-                  cat['catalogType'] == 'movie' ? Icons.movie : Icons.tv,
-                  size: 16,
-                  color: isSelected ? AppTheme.primaryColor : Colors.white38,
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppTheme.primaryColor.withValues(alpha: 0.2)
+                        : Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    cat['catalogType'] == 'movie' ? Icons.movie_outlined : Icons.tv_outlined,
+                    size: 16,
+                    color: isSelected ? AppTheme.primaryColor : Colors.white38,
+                  ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     cat['catalogName'],
@@ -855,18 +870,20 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
     final isSelected = _selectedGenre == genre;
     return GestureDetector(
       onTap: () => _selectGenre(genre),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.5) : Colors.white10),
+          color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.5) : Colors.transparent),
         ),
         child: Text(
           label,
           style: TextStyle(
             color: isSelected ? Colors.white : Colors.white60,
             fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
       ),
@@ -936,39 +953,47 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
 
   Widget _buildContentHeader() {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 12, 20, 8),
+      padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 16, 24, 12),
       child: Row(
         children: [
           if ((_selectedCatalog!['addonIcon'] ?? '').toString().isNotEmpty)
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
               child: CachedNetworkImage(
                 imageUrl: _selectedCatalog!['addonIcon'],
-                width: 28, height: 28,
+                width: 32, height: 32,
                 errorWidget: (_, _, _) => const SizedBox.shrink(),
               ),
             ),
           if ((_selectedCatalog!['addonIcon'] ?? '').toString().isNotEmpty)
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   _selectedCatalog!['catalogName'],
-                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                  style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   'from ${_selectedCatalog!['addonName']}',
-                  style: const TextStyle(color: Colors.white38, fontSize: 12),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontSize: 13),
                 ),
               ],
             ),
           ),
           if (_items.isNotEmpty)
-            Text(
-              '${_items.length} items',
-              style: const TextStyle(color: Colors.white30, fontSize: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                '${_items.length} items',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
+              ),
             ),
         ],
       ),
@@ -977,30 +1002,31 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
 
   Widget _buildDesktopSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
       child: TextField(
         controller: _searchController,
         style: const TextStyle(color: Colors.white, fontSize: 14),
         decoration: InputDecoration(
           hintText: 'Search in ${_selectedCatalog!['catalogName']}...',
-          hintStyle: const TextStyle(color: Colors.white30, fontSize: 14),
+          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.25), fontSize: 14),
           filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.05),
+          fillColor: Colors.white.withValues(alpha: 0.06),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             borderSide: BorderSide.none,
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          prefixIcon: Icon(Icons.search_rounded, color: Colors.white.withValues(alpha: 0.3), size: 20),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear, color: Colors.white38, size: 18),
+                  icon: const Icon(Icons.clear_rounded, color: Colors.white38, size: 18),
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
                     _fetchCatalogItems();
                   },
                 )
-              : const Icon(Icons.search, color: Colors.white24, size: 18),
+              : null,
         ),
         onSubmitted: (query) {
           setState(() => _searchQuery = query);
@@ -1049,13 +1075,13 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
 
     return GridView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       physics: const BouncingScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         childAspectRatio: aspectRatio,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
       ),
       itemCount: _items.length + (_isLoadingMore ? 3 : 0),
       itemBuilder: (context, index) {
@@ -1075,12 +1101,12 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
     final crossAxisCount = width > 1200 ? 7 : (width > 900 ? 5 : (width > 600 ? 4 : 3));
 
     return GridView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
         childAspectRatio: 2 / 3,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
       ),
       itemCount: 20,
       itemBuilder: (_, _) => _buildShimmerCard(),
@@ -1094,7 +1120,7 @@ class _StremioCatalogScreenState extends State<StremioCatalogScreen> {
       child: Container(
         decoration: BoxDecoration(
           color: AppTheme.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
         ),
       ),
     );
@@ -1121,13 +1147,13 @@ class _StremioCatalogCard extends StatelessWidget {
 
     return FocusableControl(
       onTap: onTap,
-      borderRadius: 12,
+      borderRadius: 14,
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: AppTheme.bgCard,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 6, offset: const Offset(0, 3))],
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 4))],
         ),
         child: Stack(
           fit: StackFit.expand,

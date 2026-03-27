@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -227,34 +226,25 @@ class MusicService {
     }
 
     try {
-      final videoId = await Isolate.run(() async {
-        final yt = YoutubeExplode();
-        try {
-          final searchQuery = '$title - $artist (Official Audio)';
-          final searchList = await yt.search.search(searchQuery);
-          if (searchList.isNotEmpty) {
-            for (final video in searchList) {
-              if (video.duration != null && video.duration!.inSeconds > 60) {
-                return video.id.value;
-              }
-            }
-            return searchList.first.id.value;
+      final searchQuery = '$title - $artist (Official Audio)';
+      final searchList = await _yt.search.search(searchQuery);
+      if (searchList.isNotEmpty) {
+        for (final video in searchList) {
+          if (video.duration != null && video.duration!.inSeconds > 60) {
+            _videoIdCache[cacheKey] = video.id.value;
+            return video.id.value;
           }
-        } finally {
-          yt.close();
         }
-        return null;
-      });
-
-      if (videoId != null) _videoIdCache[cacheKey] = videoId;
-      return videoId;
+        _videoIdCache[cacheKey] = searchList.first.id.value;
+        return searchList.first.id.value;
+      }
     } catch (e) {
       debugPrint('MusicService: YouTube matching error: $e');
     }
     return null;
   }
 
-  /// Fast stream URL fetching for playback — runs in isolate with caching
+  /// Fast stream URL fetching for playback — uses shared instance for cookie persistence
   Future<String?> getYoutubeStreamUrl(String videoId) async {
     final cached = _streamUrlCache[videoId];
     if (cached != null && !cached.isExpired) {
@@ -262,41 +252,51 @@ class MusicService {
       return cached.url;
     }
 
-    try {
-      final url = await Isolate.run(() async {
-        final yt = YoutubeExplode();
-        try {
-          final manifest = await yt.videos.streamsClient.getManifest(
-            videoId,
-            ytClients: [YoutubeApiClient.androidVr],
-          );
-          final audioStreams = manifest.audioOnly.toList();
-          if (audioStreams.isEmpty) return null;
-          audioStreams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
-          return audioStreams.first.url.toString();
-        } finally {
-          yt.close();
-        }
-      });
+    // Try clients in order: androidVr works best with visitor data, tv as fallback
+    final clientSets = [
+      [YoutubeApiClient.androidVr],
+      [YoutubeApiClient.tv],
+    ];
 
-      if (url != null) _streamUrlCache[videoId] = _CachedUrl(url);
-      return url;
-    } catch (e) {
-      debugPrint('MusicService: Stream URL error: $e');
-      return null;
+    for (final clients in clientSets) {
+      try {
+        final manifest = await _yt.videos.streamsClient.getManifest(
+          videoId,
+          ytClients: clients,
+        );
+        final audioStreams = manifest.audioOnly.toList();
+        if (audioStreams.isEmpty) continue;
+        audioStreams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+        final url = audioStreams.first.url.toString();
+        _streamUrlCache[videoId] = _CachedUrl(url);
+        debugPrint('MusicService: Got stream URL via ${clients.first}');
+        return url;
+      } catch (e) {
+        debugPrint('MusicService: ${clients.first} failed: $e');
+      }
     }
+
+    debugPrint('MusicService: All clients failed for $videoId');
+    return null;
   }
 
   Future<StreamManifest?> getYoutubeManifest(String videoId) async {
-    try {
-      return await _yt.videos.streamsClient.getManifest(
-        videoId,
-        ytClients: [YoutubeApiClient.androidVr],
-      );
-    } catch (e) {
-      debugPrint('MusicService: Get manifest error: $e');
-      return null;
+    final clientSets = [
+      [YoutubeApiClient.androidVr],
+      [YoutubeApiClient.tv],
+    ];
+
+    for (final clients in clientSets) {
+      try {
+        return await _yt.videos.streamsClient.getManifest(
+          videoId,
+          ytClients: clients,
+        );
+      } catch (e) {
+        debugPrint('MusicService: ${clients.first} manifest failed: $e');
+      }
     }
+    return null;
   }
 
   YoutubeExplode get yt => _yt;

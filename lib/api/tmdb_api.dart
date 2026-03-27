@@ -58,6 +58,29 @@ class TmdbApi {
     }
   }
 
+  /// Fetch the English clear logo for a movie or TV show.
+  /// Returns the logo file_path or empty string if none found.
+  Future<String> getLogoPath(int id, {String mediaType = 'movie'}) async {
+    try {
+      final type = mediaType == 'tv' ? 'tv' : 'movie';
+      final response = await http.get(
+        Uri.parse('$_baseUrl/$type/$id/images?api_key=$_apiKey&include_image_language=en,null'),
+      );
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final logos = decoded['logos'] as List? ?? [];
+        if (logos.isEmpty) return '';
+        // Prefer English PNG logos
+        final enLogo = logos.firstWhere(
+          (e) => e['iso_639_1'] == 'en',
+          orElse: () => logos.first,
+        );
+        return enLogo['file_path'] as String? ?? '';
+      }
+    } catch (_) {}
+    return '';
+  }
+
   Future<Movie> getMovieDetails(int movieId) async {
     final response = await http.get(Uri.parse('$_baseUrl/movie/$movieId?api_key=$_apiKey&append_to_response=images,external_ids'));
 

@@ -222,7 +222,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> with AutomaticKeepAlive
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ConstrainedBox(
+                  Flexible(
+                    child: ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 300),
                     child: SingleChildScrollView(
                       child: Wrap(
@@ -249,6 +250,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with AutomaticKeepAlive
                         }).toList(),
                       ),
                     ),
+                  ),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -288,7 +290,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> with AutomaticKeepAlive
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ConstrainedBox(
+                  Flexible(
+                    child: ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 300),
                     child: SingleChildScrollView(
                       child: Wrap(
@@ -314,6 +317,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with AutomaticKeepAlive
                         }).toList(),
                       ),
                     ),
+                  ),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -351,7 +355,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> with AutomaticKeepAlive
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ConstrainedBox(
+                  Flexible(
+                    child: ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 300),
                     child: SingleChildScrollView(
                       child: Wrap(
@@ -389,6 +394,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with AutomaticKeepAlive
                         ],
                       ),
                     ),
+                  ),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -641,7 +647,7 @@ class _CompactFilterDialog extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    child,
+                    Flexible(child: child),
                   ],
                 ),
               ),
