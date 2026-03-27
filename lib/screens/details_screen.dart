@@ -88,6 +88,9 @@ class _DetailsScreenState extends State<DetailsScreen> {
   bool _isLoadingRecommendations = false;
   final ScrollController _recommendationsScrollController = ScrollController();
 
+  // Stream resolution cancellation
+  bool _streamCancelled = false;
+
   // Desktop cast avatars
   List<Map<String, String>> _castMembers = [];
   final ScrollController _castScrollController = ScrollController();
@@ -1003,9 +1006,11 @@ class _DetailsScreenState extends State<DetailsScreen> {
       final fileIdx = stream['fileIdx'] as int?;
 
       if (!mounted) return;
+      _streamCancelled = false;
       showDialog(context: context, barrierDismissible: false, barrierColor: Colors.black,
         builder: (_) => LoadingOverlay(movie: _movie,
-          message: useDebrid && debridService != 'None' ? 'Resolving with $debridService...' : 'Starting Torrent Engine...'));
+          message: useDebrid && debridService != 'None' ? 'Resolving with $debridService...' : 'Starting Torrent Engine...',
+          onCancel: () { _streamCancelled = true; Navigator.of(context).pop(); }));
       final navigator = Navigator.of(context);
       String? url;
       int? resolvedFileIndex;
@@ -1014,6 +1019,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
           final debrid = DebridApi();
           final files = debridService == 'Real-Debrid'
               ? await debrid.resolveRealDebrid(magnet) : await debrid.resolveTorBox(magnet);
+          if (_streamCancelled) return;
           if (files.isNotEmpty) {
             if (_movie.mediaType == 'tv') {
               final s = 'S${_selectedSeason.toString().padLeft(2, '0')}';
@@ -1035,12 +1041,14 @@ class _DetailsScreenState extends State<DetailsScreen> {
           url = await TorrentStreamService().streamTorrent(magnet,
             season: _movie.mediaType == 'tv' ? _selectedSeason : null,
             episode: _movie.mediaType == 'tv' ? _selectedEpisode : null);
+          if (_streamCancelled) return;
           if (url != null) {
             final idx = Uri.parse(url).queryParameters['index'];
             if (idx != null) resolvedFileIndex = int.tryParse(idx);
           }
         }
       } catch (e) { debugPrint('Stremio hash error: $e'); }
+      if (_streamCancelled) return;
       if (navigator.canPop()) navigator.pop();
       if (url != null && mounted) {
         Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerScreen(
@@ -1122,9 +1130,11 @@ class _DetailsScreenState extends State<DetailsScreen> {
     final debridService = await _settings.getDebridService();
     if (!mounted) return;
 
+    _streamCancelled = false;
     showDialog(context: context, barrierDismissible: false, barrierColor: Colors.black,
       builder: (_) => LoadingOverlay(movie: _movie,
-        message: useDebrid && debridService != 'None' ? 'Resolving with $debridService...' : 'Starting Torrent Engine...'));
+        message: useDebrid && debridService != 'None' ? 'Resolving with $debridService...' : 'Starting Torrent Engine...',
+        onCancel: () { _streamCancelled = true; Navigator.of(context).pop(); }));
 
     String? url;
     String? magnetLink = result.magnet;
@@ -1132,12 +1142,14 @@ class _DetailsScreenState extends State<DetailsScreen> {
 
     try {
       if (!magnetLink.startsWith('magnet:')) {
-        if (!mounted) return;
+        if (!mounted || _streamCancelled) return;
         Navigator.pop(context);
         showDialog(context: context, barrierDismissible: false, barrierColor: Colors.black,
-          builder: (_) => LoadingOverlay(movie: _movie, message: 'Resolving download link...'));
+          builder: (_) => LoadingOverlay(movie: _movie, message: 'Resolving download link...',
+            onCancel: () { _streamCancelled = true; Navigator.of(context).pop(); }));
         try {
           final resolved = await _linkResolver.resolve(magnetLink);
+          if (_streamCancelled) return;
           if (resolved.isMagnet) {
             magnetLink = resolved.link;
           } else if (resolved.torrentBytes != null) {
@@ -1149,16 +1161,18 @@ class _DetailsScreenState extends State<DetailsScreen> {
             return;
           }
         } catch (e) {
+          if (_streamCancelled) return;
           if (!mounted) return;
           if (Navigator.canPop(context)) Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
           return;
         }
-        if (!mounted) return;
+        if (!mounted || _streamCancelled) return;
         if (Navigator.canPop(context)) Navigator.pop(context);
         showDialog(context: context, barrierDismissible: false, barrierColor: Colors.black,
           builder: (_) => LoadingOverlay(movie: _movie,
-            message: useDebrid && debridService != 'None' ? 'Resolving with $debridService...' : 'Starting Torrent Engine...'));
+            message: useDebrid && debridService != 'None' ? 'Resolving with $debridService...' : 'Starting Torrent Engine...',
+            onCancel: () { _streamCancelled = true; Navigator.of(context).pop(); }));
       }
 
       if (useDebrid && debridService != 'None') {
@@ -1166,6 +1180,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
         final files = debridService == 'Real-Debrid'
             ? await debrid.resolveRealDebrid(magnetLink)
             : await debrid.resolveTorBox(magnetLink);
+        if (_streamCancelled) return;
         if (files.isNotEmpty) {
           if (_movie.mediaType == 'tv') {
             final s = 'S${_selectedSeason.toString().padLeft(2, '0')}';
@@ -1187,6 +1202,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
         url = await TorrentStreamService().streamTorrent(magnetLink,
           season: _movie.mediaType == 'tv' ? _selectedSeason : null,
           episode: _movie.mediaType == 'tv' ? _selectedEpisode : null);
+        if (_streamCancelled) return;
         if (url != null) {
           final idx = Uri.parse(url).queryParameters['index'];
           if (idx != null) resolvedFileIndex = int.tryParse(idx);
@@ -1194,10 +1210,10 @@ class _DetailsScreenState extends State<DetailsScreen> {
       }
     } catch (e) {
       debugPrint('Stream error: $e');
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted && !_streamCancelled) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
 
-    if (!mounted) return;
+    if (!mounted || _streamCancelled) return;
     if (Navigator.canPop(context)) Navigator.pop(context);
 
     if (url != null) {

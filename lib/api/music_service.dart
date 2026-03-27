@@ -117,106 +117,107 @@ class MusicService {
   final Map<String, String> _videoIdCache = {};
   final Map<String, _CachedUrl> _streamUrlCache = {};
 
-  Future<List<MusicTrack>> searchTracks(String query) async {
-    try {
-      // Use Uri to properly encode non-ASCII characters (Arabic, etc.)
-      final targetUri = Uri.https('api.deezer.com', '/search', {'q': query});
-      final proxiedUrl = '$_proxyUrl${Uri.encodeComponent(targetUri.toString())}';
-      
-      final response = await http.get(Uri.parse(proxiedUrl));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final items = data['data'] as List;
-        return items.map((item) => MusicTrack.fromJson(item)).toList();
-      }
-    } catch (e) {
-      debugPrint('MusicService: Search tracks error: $e');
-    }
-    return [];
-  }
-
-  Future<List<MusicTrack>> getTrendingTracks({int index = 0, int limit = 20}) async {
-    try {
-      final targetUri = Uri.https('api.deezer.com', '/chart/0/tracks', {
-        'index': index.toString(),
-        'limit': limit.toString(),
-      });
-      final proxiedUrl = '$_proxyUrl${Uri.encodeComponent(targetUri.toString())}';
-      
-      final response = await http.get(Uri.parse(proxiedUrl));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final items = data['data'] as List;
-        return items.map((item) => MusicTrack.fromJson(item)).toList();
-      }
-    } catch (e) {
-      debugPrint('MusicService: Get trending tracks error: $e');
-    }
-    return [];
-  }
-
-  Future<List<MusicAlbum>> searchAlbums(String query) async {
-    try {
-      final targetUri = Uri.https('api.deezer.com', '/search/album', {'q': query});
-      final proxiedUrl = '$_proxyUrl${Uri.encodeComponent(targetUri.toString())}';
-      
-      final response = await http.get(Uri.parse(proxiedUrl));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final albums = data['data'] as List;
-        return albums.map((item) => MusicAlbum.fromJson(item)).toList();
-      }
-    } catch (e) {
-      debugPrint('MusicService: Search albums error: $e');
-    }
-    return [];
-  }
-
-  Future<List<MusicTrack>> getAlbumTracks(String albumId) async {
-    try {
-      final targetUrl = 'https://api.deezer.com/album/$albumId';
-      final proxiedUrl = '$_proxyUrl${Uri.encodeComponent(targetUrl)}';
-      
-      final albumResponse = await http.get(Uri.parse(proxiedUrl));
-      if (albumResponse.statusCode == 200) {
-        final albumData = json.decode(albumResponse.body);
-        final items = albumData['tracks']['data'] as List;
-        
-        return items.map((trackJson) {
-           trackJson['album'] = {
-             'title': albumData['title'],
-             'cover_xl': albumData['cover_xl'],
-             'cover_big': albumData['cover_big'],
-             'cover_medium': albumData['cover_medium'],
-             'cover_small': albumData['cover_small'],
-           };
-           return MusicTrack.fromJson(trackJson);
-        }).toList();
-      }
-    } catch (e) {
-      debugPrint('MusicService: Get album tracks error: $e');
-    }
-    return [];
-  }
-
-  Future<List<MusicTrack>> getRelatedTracks(String trackId) async {
-    try {
-      final targetUrl = 'https://api.deezer.com/track/$trackId/related';
-      final proxiedUrl = '$_proxyUrl${Uri.encodeComponent(targetUrl)}';
-      
-      final response = await http.get(Uri.parse(proxiedUrl));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final items = data['data'];
-        if (items is List) {
-          return items.map((item) => MusicTrack.fromJson(item)).toList();
+  /// Generic retry wrapper — retries up to [maxRetries] times with exponential backoff
+  Future<T> _withRetry<T>(Future<T> Function() fn, T fallback, {int maxRetries = 5}) async {
+    for (var attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        final result = await fn();
+        // For lists, treat empty as "no data" and retry
+        if (result is List && result.isEmpty && attempt < maxRetries) {
+          debugPrint('MusicService: Attempt $attempt returned empty, retrying...');
+          await Future.delayed(Duration(milliseconds: 300 * attempt));
+          continue;
+        }
+        return result;
+      } catch (e) {
+        debugPrint('MusicService: Attempt $attempt failed: $e');
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 300 * attempt));
         }
       }
-    } catch (e) {
-      debugPrint('MusicService: Get related tracks error: $e');
     }
-    return [];
+    return fallback;
   }
+
+  Future<List<MusicTrack>> searchTracks(String query) => _withRetry(() async {
+    final targetUri = Uri.https('api.deezer.com', '/search', {'q': query});
+    final proxiedUrl = '$_proxyUrl${Uri.encodeComponent(targetUri.toString())}';
+    
+    final response = await http.get(Uri.parse(proxiedUrl));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final items = data['data'] as List;
+      return items.map((item) => MusicTrack.fromJson(item)).toList();
+    }
+    return <MusicTrack>[];
+  }, <MusicTrack>[]);
+
+  Future<List<MusicTrack>> getTrendingTracks({int index = 0, int limit = 20}) => _withRetry(() async {
+    final targetUri = Uri.https('api.deezer.com', '/chart/0/tracks', {
+      'index': index.toString(),
+      'limit': limit.toString(),
+    });
+    final proxiedUrl = '$_proxyUrl${Uri.encodeComponent(targetUri.toString())}';
+    
+    final response = await http.get(Uri.parse(proxiedUrl));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final items = data['data'] as List;
+      return items.map((item) => MusicTrack.fromJson(item)).toList();
+    }
+    return <MusicTrack>[];
+  }, <MusicTrack>[]);
+
+  Future<List<MusicAlbum>> searchAlbums(String query) => _withRetry(() async {
+    final targetUri = Uri.https('api.deezer.com', '/search/album', {'q': query});
+    final proxiedUrl = '$_proxyUrl${Uri.encodeComponent(targetUri.toString())}';
+    
+    final response = await http.get(Uri.parse(proxiedUrl));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final albums = data['data'] as List;
+      return albums.map((item) => MusicAlbum.fromJson(item)).toList();
+    }
+    return <MusicAlbum>[];
+  }, <MusicAlbum>[]);
+
+  Future<List<MusicTrack>> getAlbumTracks(String albumId) => _withRetry(() async {
+    final targetUrl = 'https://api.deezer.com/album/$albumId';
+    final proxiedUrl = '$_proxyUrl${Uri.encodeComponent(targetUrl)}';
+    
+    final albumResponse = await http.get(Uri.parse(proxiedUrl));
+    if (albumResponse.statusCode == 200) {
+      final albumData = json.decode(albumResponse.body);
+      final items = albumData['tracks']['data'] as List;
+      
+      return items.map((trackJson) {
+         trackJson['album'] = {
+           'title': albumData['title'],
+           'cover_xl': albumData['cover_xl'],
+           'cover_big': albumData['cover_big'],
+           'cover_medium': albumData['cover_medium'],
+           'cover_small': albumData['cover_small'],
+         };
+         return MusicTrack.fromJson(trackJson);
+      }).toList();
+    }
+    return <MusicTrack>[];
+  }, <MusicTrack>[]);
+
+  Future<List<MusicTrack>> getRelatedTracks(String trackId) => _withRetry(() async {
+    final targetUrl = 'https://api.deezer.com/track/$trackId/related';
+    final proxiedUrl = '$_proxyUrl${Uri.encodeComponent(targetUrl)}';
+    
+    final response = await http.get(Uri.parse(proxiedUrl));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final items = data['data'];
+      if (items is List) {
+        return items.map((item) => MusicTrack.fromJson(item)).toList();
+      }
+    }
+    return <MusicTrack>[];
+  }, <MusicTrack>[]);
 
   Future<String?> getYoutubeVideoId(String title, String artist) async {
     final cacheKey = '$title|$artist';

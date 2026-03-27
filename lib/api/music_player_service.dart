@@ -44,6 +44,7 @@ class MusicPlayerService {
   // ignore: unused_field
   bool _isManuallyPaused = false;
   bool _isLoadingTrack = false;
+  int _playGeneration = 0; // Cancellation token for YT extraction
   final Set<String> _shufflePlayedIds = {};
   final Random _random = Random();
 
@@ -100,6 +101,7 @@ class MusicPlayerService {
     debugPrint('MusicPlayerService: Preparing to play: ${track.title} by ${track.artist}');
     
     _isLoadingTrack = true;
+    final generation = ++_playGeneration; // Cancel any in-flight extraction
     try {
       // 0. Set session active immediately
       final session = await AudioSession.instance;
@@ -154,6 +156,10 @@ class MusicPlayerService {
 
       // 2. YouTube Match (cached + runs in background isolate)
       final videoId = await _musicService.getYoutubeVideoId(track.title, track.artist);
+      if (_playGeneration != generation) {
+        debugPrint('MusicPlayerService: Cancelled — newer track requested');
+        return;
+      }
       if (videoId == null) {
         debugPrint('MusicPlayerService: No YouTube match');
         return;
@@ -161,6 +167,10 @@ class MusicPlayerService {
 
       // 3. Stream URL (cached + runs in background isolate)
       final streamUrl = await _musicService.getYoutubeStreamUrl(videoId);
+      if (_playGeneration != generation) {
+        debugPrint('MusicPlayerService: Cancelled — newer track requested');
+        return;
+      }
       if (streamUrl == null) {
         debugPrint('MusicPlayerService: Failed to get stream URL');
         return;

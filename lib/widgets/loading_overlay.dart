@@ -8,7 +8,8 @@ import '../utils/app_theme.dart';
 class LoadingOverlay extends StatefulWidget {
   final Movie movie;
   final String? message;
-  const LoadingOverlay({super.key, required this.movie, this.message});
+  final VoidCallback? onCancel;
+  const LoadingOverlay({super.key, required this.movie, this.message, this.onCancel});
 
   @override
   State<LoadingOverlay> createState() => _LoadingOverlayState();
@@ -98,6 +99,26 @@ class _LoadingOverlayState extends State<LoadingOverlay> with SingleTickerProvid
                     fontFamily: 'Poppins',
                   ),
                 ),
+                if (widget.onCancel != null) ...[
+                  const SizedBox(height: 24),
+                  TextButton(
+                    onPressed: widget.onCancel,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white.withValues(alpha: 0.7),
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
+                      ),
+                    ),
+                    child: const Text('CANCEL', style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 3,
+                      fontFamily: 'Poppins',
+                    )),
+                  ),
+                ],
               ],
             ),
           ),

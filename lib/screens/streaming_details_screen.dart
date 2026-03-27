@@ -32,6 +32,7 @@ class StreamingDetailsScreen extends StatefulWidget {
 
 class _StreamingDetailsScreenState extends State<StreamingDetailsScreen> {
   bool _isExtracting = false;
+  bool _extractionCancelled = false;
   String? _statusMessage;
   final StreamExtractor _extractor = StreamExtractor();
   final StremioService _stremio = StremioService();
@@ -190,11 +191,18 @@ class _StreamingDetailsScreenState extends State<StreamingDetailsScreen> {
   }
 
   Future<void> _startPlayTorrioExtraction() async {
+    _extractionCancelled = false;
     showDialog(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black,
-      builder: (context) => LoadingOverlay(movie: _movie),
+      builder: (context) => LoadingOverlay(
+        movie: _movie,
+        onCancel: () {
+          _extractionCancelled = true;
+          Navigator.of(context).pop();
+        },
+      ),
     );
 
     setState(() {
@@ -215,9 +223,10 @@ class _StreamingDetailsScreenState extends State<StreamingDetailsScreen> {
           episode: _selectedEpisode,
         );
 
+        if (_extractionCancelled) return;
         if (webStreamrSources.isNotEmpty) {
           found = true;
-          if (mounted) {
+          if (mounted && !_extractionCancelled) {
             if (Navigator.canPop(context)) Navigator.pop(context);
             Navigator.push(
               context,
@@ -248,7 +257,7 @@ class _StreamingDetailsScreenState extends State<StreamingDetailsScreen> {
       final providerKeys = _providers.keys.toList();
 
       for (var key in providerKeys) {
-        if (!mounted) break;
+        if (!mounted || _extractionCancelled) break;
         if (key == 'webstreamr') continue; // Already tried directly
         
         final provider = _providers[key];
@@ -269,9 +278,10 @@ class _StreamingDetailsScreenState extends State<StreamingDetailsScreen> {
 
         try {
           var result = await _extractor.extract(url, timeout: const Duration(seconds: 5));
+          if (_extractionCancelled) break;
           if (result != null) {
             found = true;
-            if (mounted) {
+            if (mounted && !_extractionCancelled) {
               if (Navigator.canPop(context)) Navigator.pop(context);
               Navigator.push(
                 context,
@@ -303,6 +313,10 @@ class _StreamingDetailsScreenState extends State<StreamingDetailsScreen> {
     }
 
     if (mounted) {
+      if (_extractionCancelled) {
+        setState(() { _isExtracting = false; _statusMessage = null; });
+        return;
+      }
       if (!found && Navigator.canPop(context)) Navigator.pop(context);
       setState(() {
         _isExtracting = false;
