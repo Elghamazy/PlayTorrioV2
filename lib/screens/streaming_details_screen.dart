@@ -401,7 +401,7 @@ class _StreamingDetailsScreenState extends State<StreamingDetailsScreen> {
       children: [
         if (_movie.backdropPath.isNotEmpty)
           CachedNetworkImage(
-            imageUrl: TmdbApi.getImageUrl(_movie.backdropPath),
+            imageUrl: TmdbApi.getBackdropUrl(_movie.backdropPath),
             fit: BoxFit.cover,
           ),
         BackdropFilter(
@@ -955,7 +955,7 @@ class _StreamingDetailsScreenState extends State<StreamingDetailsScreen> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: CachedNetworkImage(
-                    imageUrl: TmdbApi.getImageUrl(screenshot),
+                    imageUrl: TmdbApi.getStillUrl(screenshot),
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -1114,7 +1114,7 @@ class _HorizontalEpisodeCardState extends State<_HorizontalEpisodeCard> {
                   height: 190,
                   child: widget.stillPath != null
                       ? CachedNetworkImage(
-                          imageUrl: TmdbApi.getImageUrl(widget.stillPath!),
+                          imageUrl: TmdbApi.getStillUrl(widget.stillPath!),
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
@@ -1292,7 +1292,7 @@ class _EpisodeCardState extends State<_EpisodeCard> {
                       borderRadius: BorderRadius.circular(8),
                       child: widget.episode['still_path'] != null
                           ? CachedNetworkImage(
-                              imageUrl: TmdbApi.getImageUrl(widget.episode['still_path']),
+                              imageUrl: TmdbApi.getStillUrl(widget.episode['still_path']),
                               fit: BoxFit.cover,
                               width: double.infinity,
                               height: double.infinity,

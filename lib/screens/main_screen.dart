@@ -196,7 +196,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       body: Stack(
         children: [
           // Base gradient
-          Container(decoration: AppTheme.backgroundDecoration),
+          Container(decoration: AppTheme.effectiveBackground),
+          // Ambient glows (skipped in light mode)
+          if (!AppTheme.isLightMode) ...[
           // Ambient purple glow – top-right
           Positioned(
             top: -80,
@@ -251,6 +253,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
+          ], // end light mode glow skip
           // Content layer
           Row(
             children: [
@@ -310,13 +313,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildScrollableBottomNav() {
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
+    final lightMode = AppTheme.isLightMode;
+
+    Widget navContent = Container(
           height: 80,
           decoration: BoxDecoration(
-            color: const Color(0xFF0F0418).withValues(alpha: 0.75),
+            color: const Color(0xFF0F0418).withValues(alpha: lightMode ? 1.0 : 0.75),
             border: const Border(top: BorderSide(color: Colors.white10, width: 0.5)),
           ),
           child: Stack(
@@ -367,6 +369,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               }).toList(),
             ),
           ),
+          if (!lightMode)
           Positioned(
             right: 0, top: 0, bottom: 0,
             child: IgnorePointer(
@@ -385,8 +388,17 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
+    );
+
+    if (lightMode) {
+      return ClipRect(child: navContent);
+    }
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: navContent,
       ),
-    ),
     );
   }
 }

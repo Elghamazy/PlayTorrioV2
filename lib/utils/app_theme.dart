@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../api/settings_service.dart';
 
 class AppTheme {
   // Cinematic Dark Theme
@@ -8,6 +9,9 @@ class AppTheme {
   static const Color bgCard = Color(0xFF15151E);
   static const Color primaryColor = Color(0xFF7C4DFF); // Electric Violet
   static const Color accentColor = Color(0xFF00E5FF); // Cyan Accent
+
+  /// Whether light mode is currently active (cached from notifier).
+  static bool get isLightMode => SettingsService.lightModeNotifier.value;
   
   static const BoxDecoration backgroundDecoration = BoxDecoration(
     color: bgDark,
@@ -21,6 +25,15 @@ class AppTheme {
       stops: [0.0, 0.7],
     ),
   );
+
+  /// A flat bg decoration with no gradient — used in light mode.
+  static const BoxDecoration backgroundDecorationFlat = BoxDecoration(
+    color: bgDark,
+  );
+
+  /// Returns the correct background based on light mode state.
+  static BoxDecoration get effectiveBackground =>
+      isLightMode ? backgroundDecorationFlat : backgroundDecoration;
 
   static ThemeData get themeData {
     return ThemeData(
@@ -97,6 +110,8 @@ class _FocusableControlState extends State<FocusableControl> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    final lightMode = AppTheme.isLightMode;
+
     return Focus(
       autofocus: widget.autoFocus,
       onFocusChange: (f) {
@@ -123,24 +138,32 @@ class _FocusableControlState extends State<FocusableControl> with SingleTickerPr
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
           onTap: widget.onTap,
-          child: AnimatedBuilder(
-            animation: _scale,
-            builder: (context, child) => Transform.scale(scale: _scale.value, child: child),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(widget.borderRadius),
-                boxShadow: (_isFocused || _isHovered) ? [
-                  BoxShadow(
-                    color: (widget.glowColor ?? AppTheme.primaryColor).withValues(alpha: 0.4),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  )
-                ] : [],
-              ),
-              child: widget.child,
-            ),
-          ),
+          child: lightMode
+              // Light mode: no scale animation, no glow
+              ? Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(widget.borderRadius),
+                  ),
+                  child: widget.child,
+                )
+              : AnimatedBuilder(
+                  animation: _scale,
+                  builder: (context, child) => Transform.scale(scale: _scale.value, child: child),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(widget.borderRadius),
+                      boxShadow: (_isFocused || _isHovered) ? [
+                        BoxShadow(
+                          color: (widget.glowColor ?? AppTheme.primaryColor).withValues(alpha: 0.4),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        )
+                      ] : [],
+                    ),
+                    child: widget.child,
+                  ),
+                ),
         ),
       ),
     );

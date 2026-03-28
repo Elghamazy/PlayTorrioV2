@@ -74,6 +74,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _torrentCacheType = 'ram';
   int _torrentRamCacheMb = 200;
 
+  // Light mode
+  bool _isLightMode = false;
+
   // Navbar config
   List<String> _navbarVisible = [];
   List<String> _navbarOrder = [];
@@ -114,6 +117,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final cacheType = await _settings.getTorrentCacheType();
     final ramCacheMb = await _settings.getTorrentRamCacheMb();
 
+    // Load light mode
+    final lightMode = await _settings.isLightModeEnabled();
+
     // Load navbar config
     final navVisible = await _settings.getNavbarConfig();
     // Full order: visible items first, then hidden items
@@ -145,6 +151,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _prowlarrApiKeyController.text = prowlarrKey ?? '';
         _torrentCacheType = cacheType;
         _torrentRamCacheMb = ramCacheMb;
+        _isLightMode = lightMode;
         _navbarVisible = navVisible;
         _navbarOrder = navOrder;
       });
@@ -265,6 +272,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   delegate: SliverChildListDelegate([
                     _buildSectionHeader('Backup & Restore'),
                     _buildBackupRestore(),
+                    const SizedBox(height: 32),
+                    _buildSectionHeader('Performance'),
+                    _buildFocusableToggle(
+                      'Light Mode',
+                      'Disables blur effects, glows, shadows, and animations for better FPS on low-end devices.',
+                      _isLightMode,
+                      (val) async {
+                        await _settings.setLightMode(val);
+                        setState(() => _isLightMode = val);
+                      },
+                    ),
                     const SizedBox(height: 32),
                     _buildSectionHeader('Playback'),
                     _buildFocusableToggle(
@@ -395,7 +413,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(height: 64),
                     const Center(
                       child: Text(
-                        'PlayTorrio Native v1.1.0',
+                        'PlayTorrio Native v1.1.1',
                         style: TextStyle(color: Colors.white24, fontSize: 12, letterSpacing: 2, fontWeight: FontWeight.bold),
                       ),
                     ),

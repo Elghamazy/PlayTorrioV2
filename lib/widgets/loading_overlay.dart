@@ -46,15 +46,18 @@ class _LoadingOverlayState extends State<LoadingOverlay> with SingleTickerProvid
         children: [
           // Blurred Backdrop
           CachedNetworkImage(
-            imageUrl: TmdbApi.getImageUrl(widget.movie.backdropPath),
+            imageUrl: TmdbApi.getBackdropUrl(widget.movie.backdropPath),
             fit: BoxFit.cover,
             placeholder: (context, url) => Container(color: Colors.black),
             errorWidget: (context, url, error) => Container(color: Colors.black),
           ),
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(color: Colors.black.withValues(alpha: 0.6)),
-          ),
+          if (AppTheme.isLightMode)
+            Container(color: Colors.black.withValues(alpha: 0.8))
+          else
+            BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(color: Colors.black.withValues(alpha: 0.6)),
+            ),
           
           // Logo/Title (Restored clear logo logic)
           Center(

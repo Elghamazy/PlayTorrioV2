@@ -76,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   void _startHeroTimer() {
+    if (AppTheme.isLightMode) return; // skip periodic rebuilds in light mode
     _heroTimer = Timer.periodic(const Duration(seconds: 8), (timer) {
       if (_heroController.hasClients) {
         final next = (_heroIndex + 1) % 5;
@@ -274,7 +275,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       backgroundColor: AppTheme.bgDark,
       body: Stack(
         children: [
-          // Atmospheric ambient glow spots
+          // Atmospheric ambient glow spots (skipped in light mode)
+          if (!AppTheme.isLightMode) ...[
           Positioned(
             top: MediaQuery.of(context).size.height * 0.6,
             left: -80,
@@ -303,28 +305,31 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               ),
             ),
           ),
+          ],
           CustomScrollView(
         cacheExtent: 500,
         physics: const BouncingScrollPhysics(),
         slivers: [
           // Hero
           SliverToBoxAdapter(
-            child: FutureBuilder<List<Movie>>(
-              future: _trendingFuture,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return _buildHeroShimmer();
-                }
-                return _buildHeroCarousel(snapshot.data!.take(5).toList());
-              },
+            child: RepaintBoundary(
+              child: FutureBuilder<List<Movie>>(
+                future: _trendingFuture,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return _buildHeroShimmer();
+                  }
+                  return _buildHeroCarousel(snapshot.data!.take(5).toList());
+                },
+              ),
             ),
           ),
           // Continue Watching
-          const SliverToBoxAdapter(child: _ContinueWatchingSection()),
+          const SliverToBoxAdapter(child: RepaintBoundary(child: _ContinueWatchingSection())),
           // Trending
-          SliverToBoxAdapter(child: _MovieSection(title: 'Trending Now', icon: Icons.local_fire_department_rounded, future: _trendingFuture, onMovieTap: _openDetails)),
+          SliverToBoxAdapter(child: RepaintBoundary(child: _MovieSection(title: 'Trending Now', icon: Icons.local_fire_department_rounded, future: _trendingFuture, onMovieTap: _openDetails))),
           // Popular
-          SliverToBoxAdapter(child: _MovieSection(title: 'Popular', icon: Icons.movie_filter_rounded, future: _popularFuture, onMovieTap: _openDetails, isPortrait: true, showRank: true)),
+          SliverToBoxAdapter(child: RepaintBoundary(child: _MovieSection(title: 'Popular', icon: Icons.movie_filter_rounded, future: _popularFuture, onMovieTap: _openDetails, isPortrait: true, showRank: true))),
           // Stremio Addon Catalogs
           if (_catalogsLoaded)
             ..._stremioCatalogs.map((cat) {
@@ -332,18 +337,20 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               final items = _catalogItems[key];
               if (items == null || items.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
               return SliverToBoxAdapter(
-                child: _StremioCatalogSection(
-                  catalog: cat,
-                  items: items,
-                  onItemTap: _openStremioItem,
-                  onShowAll: () => _openStremioCatalog(cat),
+                child: RepaintBoundary(
+                  child: _StremioCatalogSection(
+                    catalog: cat,
+                    items: items,
+                    onItemTap: _openStremioItem,
+                    onShowAll: () => _openStremioCatalog(cat),
+                  ),
                 ),
               );
             }),
           // Top Rated
-          SliverToBoxAdapter(child: _MovieSection(title: 'Top Rated', icon: Icons.star_rounded, future: _topRatedFuture, onMovieTap: _openDetails)),
+          SliverToBoxAdapter(child: RepaintBoundary(child: _MovieSection(title: 'Top Rated', icon: Icons.star_rounded, future: _topRatedFuture, onMovieTap: _openDetails))),
           // New Releases
-          SliverToBoxAdapter(child: _MovieSection(title: 'New Releases', icon: Icons.new_releases_rounded, future: _nowPlayingFuture, onMovieTap: _openDetails, isPortrait: true)),
+          SliverToBoxAdapter(child: RepaintBoundary(child: _MovieSection(title: 'New Releases', icon: Icons.new_releases_rounded, future: _nowPlayingFuture, onMovieTap: _openDetails, isPortrait: true))),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
@@ -354,13 +361,13 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   Widget _buildHeroShimmer() {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final h = isLandscape ? MediaQuery.of(context).size.height * 0.65 : MediaQuery.of(context).size.height * 0.82;
+    final placeholder = Container(height: h, color: AppTheme.bgCard);
+    if (AppTheme.isLightMode) return placeholder;
     return Shimmer.fromColors(
       baseColor: AppTheme.bgCard,
       highlightColor: const Color(0xFF1E1E2F),
-      child: Container(
-        height: isLandscape ? MediaQuery.of(context).size.height * 0.65 : MediaQuery.of(context).size.height * 0.82,
-        color: AppTheme.bgCard,
-      ),
+      child: placeholder,
     );
   }
 
@@ -385,7 +392,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 children: [
                   CachedNetworkImage(
                     imageUrl: movie.backdropPath.isNotEmpty 
-                        ? TmdbApi.getImageUrl(movie.backdropPath) 
+                        ? TmdbApi.getBackdropUrl(movie.backdropPath) 
                         : TmdbApi.getImageUrl(movie.posterPath),
                     fit: BoxFit.cover,
                     alignment: Alignment.topCenter,
@@ -424,7 +431,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       ),
                     ),
                   ),
-                  // Subtle color tint overlay
+                  // Subtle color tint overlay (skipped in light mode)
+                  if (!AppTheme.isLightMode)
                   Container(
                     decoration: BoxDecoration(
                       gradient: RadialGradient(
@@ -576,7 +584,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(28),
-                          boxShadow: [
+                          boxShadow: AppTheme.isLightMode ? null : [
                             BoxShadow(color: Colors.white.withValues(alpha: 0.15), blurRadius: 20, spreadRadius: -2),
                           ],
                         ),
@@ -601,47 +609,25 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // More Info — frosted glass pill
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                          child: Material(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(28),
-                            child: InkWell(
-                              onTap: () => _openDetails(heroMovie),
-                              borderRadius: BorderRadius.circular(28),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.info_outline_rounded, color: Colors.white.withValues(alpha: 0.85), size: 20),
-                                    const SizedBox(width: 8),
-                                    Text('More Info', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                              ),
-                            ),
+                      // More Info — frosted glass pill (simplified in light mode)
+                      _buildFrostedPill(
+                        onTap: () => _openDetails(heroMovie),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.info_outline_rounded, color: Colors.white.withValues(alpha: 0.85), size: 20),
+                              const SizedBox(width: 8),
+                              Text('More Info', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 14, fontWeight: FontWeight.w600)),
+                            ],
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // My List — frosted circle
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                            ),
-                            child: _MyListButton.movie(movie: heroMovie),
-                          ),
-                        ),
+                      // My List — frosted circle (simplified in light mode)
+                      _buildFrostedCircle(
+                        child: _MyListButton.movie(movie: heroMovie),
                       ),
                     ],
                   ),
@@ -658,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(2),
                         color: i == _heroIndex ? Colors.white : Colors.white.withValues(alpha: 0.2),
-                        boxShadow: i == _heroIndex ? [BoxShadow(color: Colors.white.withValues(alpha: 0.3), blurRadius: 8)] : null,
+                        boxShadow: (i == _heroIndex && !AppTheme.isLightMode) ? [BoxShadow(color: Colors.white.withValues(alpha: 0.3), blurRadius: 8)] : null,
                       ),
                     )),
                   ),
@@ -682,20 +668,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                     );
                   }
                 },
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                      ),
-                      child: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white.withValues(alpha: 0.7), size: 18),
-                    ),
-                  ),
+                child: _buildFrostedArrow(
+                  icon: Icons.arrow_back_ios_new_rounded,
                 ),
               ),
             ),
@@ -715,20 +689,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                     );
                   }
                 },
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.25),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                      ),
-                      child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withValues(alpha: 0.7), size: 18),
-                    ),
-                  ),
+                child: _buildFrostedArrow(
+                  icon: Icons.arrow_forward_ios_rounded,
                 ),
               ),
             ),
@@ -747,13 +709,74 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         color: Colors.white,
         height: 1.0,
         letterSpacing: -1.0,
-        shadows: [
+        shadows: AppTheme.isLightMode ? null : [
           const Shadow(color: Colors.black, blurRadius: 40),
           Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 80),
         ],
       ),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  // ── Light-mode-aware frosted glass helpers ────────────────────────
+
+  Widget _buildFrostedPill({required VoidCallback onTap, required Widget child}) {
+    final inner = Material(
+      color: Colors.white.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(28),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(28),
+        child: child,
+      ),
+    );
+    if (AppTheme.isLightMode) return inner;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: inner,
+      ),
+    );
+  }
+
+  Widget _buildFrostedCircle({required Widget child}) {
+    final inner = Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: child,
+    );
+    if (AppTheme.isLightMode) return inner;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: inner,
+      ),
+    );
+  }
+
+  Widget _buildFrostedArrow({required IconData icon}) {
+    final inner = Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: AppTheme.isLightMode ? 0.45 : 0.25),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Icon(icon, color: Colors.white.withValues(alpha: 0.7), size: 18),
+    );
+    if (AppTheme.isLightMode) return inner;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: inner,
+      ),
     );
   }
 }
@@ -808,6 +831,26 @@ class _MovieSectionState extends State<_MovieSection> {
     super.dispose();
   }
 
+  Widget _buildSmallFrostedArrow(IconData icon) {
+    final inner = Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: AppTheme.isLightMode ? 0.12 : 0.08),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Icon(icon, color: Colors.white.withValues(alpha: 0.6), size: 14),
+    );
+    if (AppTheme.isLightMode) return inner;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: inner,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Movie>>(
@@ -816,10 +859,7 @@ class _MovieSectionState extends State<_MovieSection> {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           // Shimmer placeholder while loading
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Shimmer.fromColors(
-              baseColor: AppTheme.bgCard,
-              highlightColor: const Color(0xFF1E1E2F),
-              child: Padding(
+            final shimmerChild = Padding(
                 padding: const EdgeInsets.only(top: 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -844,7 +884,12 @@ class _MovieSectionState extends State<_MovieSection> {
                     ),
                   ],
                 ),
-              ),
+              );
+            if (AppTheme.isLightMode) return shimmerChild;
+            return Shimmer.fromColors(
+              baseColor: AppTheme.bgCard,
+              highlightColor: const Color(0xFF1E1E2F),
+              child: shimmerChild,
             );
           }
           return const SizedBox.shrink();
@@ -890,40 +935,12 @@ class _MovieSectionState extends State<_MovieSection> {
                   ),
                   GestureDetector(
                     onTap: _scrollLeft,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                        child: Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                          ),
-                          child: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white.withValues(alpha: 0.6), size: 14),
-                        ),
-                      ),
-                    ),
+                    child: _buildSmallFrostedArrow(Icons.arrow_back_ios_new_rounded),
                   ),
                   const SizedBox(width: 6),
                   GestureDetector(
                     onTap: _scrollRight,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                        child: Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                          ),
-                          child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withValues(alpha: 0.6), size: 14),
-                        ),
-                      ),
-                    ),
+                    child: _buildSmallFrostedArrow(Icons.arrow_forward_ios_rounded),
                   ),
                 ],
               ),
@@ -1008,7 +1025,7 @@ class _MovieCard extends StatelessWidget {
               color: AppTheme.bgCard,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: Colors.white.withValues(alpha: 0.06), width: 0.5),
-              boxShadow: [
+              boxShadow: AppTheme.isLightMode ? null : [
                 BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 16, offset: const Offset(0, 8)),
                 BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.05), blurRadius: 20, spreadRadius: -4),
               ],
@@ -1053,31 +1070,7 @@ class _MovieCard extends StatelessWidget {
                 if (movie.voteAverage > 0)
                   Positioned(
                     top: 8, right: 8,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
-                              const SizedBox(width: 3),
-                              Text(
-                                movie.voteAverage.toStringAsFixed(1),
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    child: _buildRatingBadge(movie.voteAverage),
                   ),
 
                 // Bottom content
@@ -1132,6 +1125,65 @@ class _MovieCard extends StatelessWidget {
   }
 }
 
+/// Rating badge — uses frosted glass when not in light mode.
+Widget _buildRatingBadge(double voteAverage) {
+  final inner = Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: AppTheme.isLightMode ? 0.55 : 0.35),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
+        const SizedBox(width: 3),
+        Text(
+          voteAverage.toStringAsFixed(1),
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+      ],
+    ),
+  );
+  if (AppTheme.isLightMode) return inner;
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(8),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+      child: inner,
+    ),
+  );
+}
+
+/// Rating badge for string ratings (Stremio) — uses frosted glass when not in light mode.
+Widget _buildRatingBadgeText(String rating) {
+  final content = Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+    decoration: BoxDecoration(
+      color: Colors.black.withValues(alpha: AppTheme.isLightMode ? 0.5 : 0.3),
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.star_rounded, color: Colors.amber, size: 11),
+        const SizedBox(width: 2),
+        Text(rating, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+      ],
+    ),
+  );
+  if (AppTheme.isLightMode) return content;
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(6),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+      child: content,
+    ),
+  );
+}
+
 class _ContinueWatchingSection extends StatefulWidget {
   const _ContinueWatchingSection();
 
@@ -1163,6 +1215,26 @@ class _ContinueWatchingSectionState extends State<_ContinueWatchingSection> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Widget _buildCWSectionArrow(IconData icon) {
+    final inner = Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: AppTheme.isLightMode ? 0.12 : 0.08),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Icon(icon, color: Colors.white.withValues(alpha: 0.6), size: 14),
+    );
+    if (AppTheme.isLightMode) return inner;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: inner,
+      ),
+    );
   }
 
   Future<void> _resumePlayback(Map<String, dynamic> item) async {
@@ -1623,40 +1695,12 @@ class _ContinueWatchingSectionState extends State<_ContinueWatchingSection> {
                   if (history.isNotEmpty) ...[
                     GestureDetector(
                       onTap: _scrollLeft,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                          child: Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                            ),
-                            child: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white.withValues(alpha: 0.6), size: 14),
-                          ),
-                        ),
-                      ),
+                      child: _buildCWSectionArrow(Icons.arrow_back_ios_new_rounded),
                     ),
                     const SizedBox(width: 6),
                     GestureDetector(
                       onTap: _scrollRight,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                          child: Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                            ),
-                            child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withValues(alpha: 0.6), size: 14),
-                          ),
-                        ),
-                      ),
+                      child: _buildCWSectionArrow(Icons.arrow_forward_ios_rounded),
                     ),
                   ],
                 ],
@@ -1689,6 +1733,29 @@ class _ContinueWatchingSectionState extends State<_ContinueWatchingSection> {
       },
     );
   }
+}
+
+Widget _buildCWPlayButton() {
+  final inner = Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppTheme.primaryColor.withValues(alpha: 0.7),
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      boxShadow: AppTheme.isLightMode
+          ? null
+          : [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.4), blurRadius: 24, spreadRadius: 2)],
+    ),
+    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
+  );
+  if (AppTheme.isLightMode) return inner;
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(30),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+      child: inner,
+    ),
+  );
 }
 
 class _HistoryCard extends StatelessWidget {
@@ -1738,7 +1805,7 @@ class _HistoryCard extends StatelessWidget {
           color: AppTheme.bgCard,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.white.withValues(alpha: 0.06), width: 0.5),
-          boxShadow: [
+          boxShadow: AppTheme.isLightMode ? null : [
             BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 16, offset: const Offset(0, 6)),
             BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.06), blurRadius: 24, spreadRadius: -4),
           ],
@@ -1773,24 +1840,9 @@ class _HistoryCard extends StatelessWidget {
               ),
             ),
 
-            // Play button (center) — cinematic glow
+            // Play button (center)
             Center(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(30),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.7),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                      boxShadow: [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.4), blurRadius: 24, spreadRadius: 2)],
-                    ),
-                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
-                  ),
-                ),
-              ),
+              child: _buildCWPlayButton(),
             ),
 
             // Top-right actions
@@ -1944,6 +1996,37 @@ class _StremioCatalogSectionState extends State<_StremioCatalogSection> {
     super.dispose();
   }
 
+  Widget _wrapFrosted({required double borderRadius, required Widget child}) {
+    if (AppTheme.isLightMode) return child;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildStremioArrow(IconData icon) {
+    final inner = Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: AppTheme.isLightMode ? 0.12 : 0.08),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Icon(icon, color: Colors.white.withValues(alpha: 0.6), size: 14),
+    );
+    if (AppTheme.isLightMode) return inner;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+        child: inner,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cat = widget.catalog;
@@ -2017,11 +2100,9 @@ class _StremioCatalogSectionState extends State<_StremioCatalogSection> {
               FocusableControl(
                 onTap: widget.onShowAll,
                 borderRadius: 20,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                    child: Container(
+                child: _wrapFrosted(
+                  borderRadius: 20,
+                  child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(20),
@@ -2036,7 +2117,6 @@ class _StremioCatalogSectionState extends State<_StremioCatalogSection> {
                           Icon(Icons.arrow_forward_ios, size: 11, color: Colors.white.withValues(alpha: 0.6)),
                         ],
                       ),
-                    ),
                   ),
                 ),
               ),
@@ -2046,40 +2126,12 @@ class _StremioCatalogSectionState extends State<_StremioCatalogSection> {
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: _scrollLeft,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                      ),
-                      child: Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white.withValues(alpha: 0.6), size: 14),
-                    ),
-                  ),
-                ),
+                child: _buildStremioArrow(Icons.arrow_back_ios_new_rounded),
               ),
               const SizedBox(width: 6),
               GestureDetector(
                 onTap: _scrollRight,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                    child: Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                      ),
-                      child: Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withValues(alpha: 0.6), size: 14),
-                    ),
-                  ),
-                ),
+                child: _buildStremioArrow(Icons.arrow_forward_ios_rounded),
               ),
             ],
           ),
@@ -2143,7 +2195,7 @@ class _StremioCatalogCard extends StatelessWidget {
           color: AppTheme.bgCard,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: Colors.white.withValues(alpha: 0.06), width: 0.5),
-          boxShadow: [
+          boxShadow: AppTheme.isLightMode ? null : [
             BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 16, offset: const Offset(0, 6)),
             BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.05), blurRadius: 20, spreadRadius: -4),
           ],
@@ -2185,28 +2237,7 @@ class _StremioCatalogCard extends StatelessWidget {
             if (rating.isNotEmpty)
               Positioned(
                 top: 8, right: 8,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
-                          const SizedBox(width: 3),
-                          Text(rating, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                child: _buildRatingBadgeText(rating),
               ),
 
             // Name

@@ -51,7 +51,7 @@ class _HeroBannerState extends State<HeroBanner> {
               },
             ),
             items: featuredMovies.map((movie) {
-              final imageUrl = TmdbApi.getImageUrl(movie.backdropPath);
+              final imageUrl = TmdbApi.getBackdropUrl(movie.backdropPath);
               return InkWell(
                 onTap: () => _navigateToDetails(movie),
                 focusColor: Colors.deepPurpleAccent.withValues(alpha: 0.1),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/movie.dart';
+import '../utils/app_theme.dart';
 import 'movie_poster.dart';
 
 class MovieSection extends StatefulWidget {
@@ -67,7 +68,7 @@ class _MovieSectionState extends State<MovieSection> {
                 decoration: BoxDecoration(
                   color: Colors.deepPurpleAccent,
                   borderRadius: BorderRadius.circular(2),
-                  boxShadow: [
+                  boxShadow: AppTheme.isLightMode ? null : [
                     BoxShadow(
                       color: Colors.deepPurpleAccent.withValues(alpha: 0.5),
                       blurRadius: 8,
@@ -118,7 +119,7 @@ class _MovieSectionState extends State<MovieSection> {
                       color: Colors.black.withValues(alpha: 0.6),
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white24),
-                      boxShadow: [
+                      boxShadow: AppTheme.isLightMode ? null : [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.4),
                           blurRadius: 8,
@@ -144,7 +145,7 @@ class _MovieSectionState extends State<MovieSection> {
                       color: Colors.black.withValues(alpha: 0.6),
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white24),
-                      boxShadow: [
+                      boxShadow: AppTheme.isLightMode ? null : [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.4),
                           blurRadius: 8,

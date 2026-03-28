@@ -5,7 +5,19 @@ import '../models/movie.dart';
 class TmdbApi {
   static const String _apiKey = 'c3515fdc674ea2bd7b514f4bc3616a4a';
   static const String _baseUrl = 'https://api.themoviedb.org/3';
-  static const String _imageBaseUrl = 'https://image.tmdb.org/t/p/original';
+  static const String _imageBaseUrl = 'https://image.tmdb.org/t/p/w500';
+
+  /// High-res backdrop for hero banners / full-width headers.
+  static String getBackdropUrl(String path) => 'https://image.tmdb.org/t/p/w1280$path';
+
+  /// Small profile photo for cast lists.
+  static String getProfileUrl(String path) => 'https://image.tmdb.org/t/p/w185$path';
+
+  /// Tiny still/thumbnail for episode lists.
+  static String getStillUrl(String path) => 'https://image.tmdb.org/t/p/w300$path';
+
+  /// Full original quality — only use when absolutely needed.
+  static String getOriginalUrl(String path) => 'https://image.tmdb.org/t/p/original$path';
 
   Future<List<Movie>> getTrending() async {
     final response = await http.get(Uri.parse('$_baseUrl/trending/movie/day?api_key=$_apiKey'));

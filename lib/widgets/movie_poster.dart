@@ -6,6 +6,7 @@ import '../api/tmdb_api.dart';
 import '../screens/details_screen.dart';
 import '../screens/streaming_details_screen.dart';
 import '../api/settings_service.dart';
+import '../utils/app_theme.dart';
 
 class MoviePoster extends StatefulWidget {
   final Movie movie;
@@ -54,7 +55,7 @@ class _MoviePosterState extends State<MoviePoster> {
       highlightColor: Colors.transparent,
       borderRadius: BorderRadius.circular(16.0),
       child: AnimatedScale(
-        scale: isActive ? 1.05 : 1.0, // Reduced scale slightly for better performance
+        scale: isActive && !AppTheme.isLightMode ? 1.05 : 1.0,
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOutCubic,
         child: Container(
@@ -65,7 +66,7 @@ class _MoviePosterState extends State<MoviePoster> {
               color: isActive ? Colors.deepPurpleAccent : Colors.white10,
               width: isActive ? 3 : 1,
             ),
-            boxShadow: isActive
+            boxShadow: isActive && !AppTheme.isLightMode
                 ? [
                     BoxShadow(
                       color: Colors.deepPurpleAccent.withValues(alpha: 0.4),
@@ -85,6 +86,7 @@ class _MoviePosterState extends State<MoviePoster> {
                 CachedNetworkImage(
                   imageUrl: TmdbApi.getImageUrl(widget.movie.posterPath),
                   fit: BoxFit.cover,
+                  memCacheWidth: 340,
                   placeholder: (context, url) => Container(
                     color: const Color(0xFF2D0C3F),
                     child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),

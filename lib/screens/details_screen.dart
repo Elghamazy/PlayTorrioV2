@@ -1294,7 +1294,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
   /// Returns a full image URL. If the path is already a full URL (e.g. from
   /// Stremio), returns it as-is; otherwise wraps with TMDB base URL.
   String _imageUrl(String path) =>
-      path.startsWith('http') ? path : TmdbApi.getImageUrl(path);
+      path.startsWith('http') ? path : TmdbApi.getBackdropUrl(path);
 
   Widget _buildBackdropWidget() {
     final url = _imageUrl(_movie.backdropPath.isNotEmpty ? _movie.backdropPath : _movie.posterPath);
@@ -1779,7 +1779,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
                                 ? CachedNetworkImage(
                                     imageUrl: thumbnail.startsWith('http') 
                                         ? thumbnail 
-                                        : TmdbApi.getImageUrl(thumbnail),
+                                        : TmdbApi.getStillUrl(thumbnail),
                                     fit: BoxFit.cover,
                                     errorWidget: (c, u, e) => Container(
                                       color: Colors.white.withValues(alpha: 0.06),
@@ -2458,7 +2458,7 @@ class _DetailsScreenState extends State<DetailsScreen> {
                       backgroundColor: Colors.white10,
                       backgroundImage: profilePath.isNotEmpty
                           ? CachedNetworkImageProvider(
-                              TmdbApi.getImageUrl(profilePath))
+                              TmdbApi.getProfileUrl(profilePath))
                           : null,
                       child: profilePath.isEmpty
                           ? Text(

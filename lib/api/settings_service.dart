@@ -29,6 +29,12 @@ class SettingsService {
   static const String _prowlarrBaseUrlKey = 'prowlarr_base_url';
   static const String _prowlarrApiKeyKey = 'prowlarr_api_key';
 
+  // Light mode (performance)
+  static const String _lightModeKey = 'light_mode';
+
+  /// Notifier that fires when light mode changes so all widgets can react.
+  static final ValueNotifier<bool> lightModeNotifier = ValueNotifier<bool>(false);
+
   // Torrent cache settings
   static const String _torrentCacheTypeKey = 'torrent_cache_type';
   static const String _torrentRamCacheMbKey = 'torrent_ram_cache_mb';
@@ -202,6 +208,26 @@ class SettingsService {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // Light Mode (Performance)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Future<bool> isLightModeEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_lightModeKey) ?? false;
+  }
+
+  Future<void> setLightMode(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_lightModeKey, enabled);
+    lightModeNotifier.value = enabled;
+  }
+
+  /// Call once at app startup to hydrate the notifier from disk.
+  Future<void> initLightMode() async {
+    lightModeNotifier.value = await isLightModeEnabled();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Navbar Configuration
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -261,7 +287,7 @@ class SettingsService {
     // --- SharedPreferences ---
     final prefsMap = <String, dynamic>{};
     // Bool keys
-    for (final key in [_streamingModeKey, _useDebridKey]) {
+    for (final key in [_streamingModeKey, _useDebridKey, _lightModeKey]) {
       final v = prefs.getBool(key);
       if (v != null) prefsMap[key] = v;
     }
@@ -314,7 +340,7 @@ class SettingsService {
     final prefsMap = data['shared_preferences'] as Map<String, dynamic>? ?? {};
 
     // Bool keys
-    for (final key in [_streamingModeKey, _useDebridKey]) {
+    for (final key in [_streamingModeKey, _useDebridKey, _lightModeKey]) {
       if (prefsMap.containsKey(key)) {
         await prefs.setBool(key, prefsMap[key] as bool);
       }

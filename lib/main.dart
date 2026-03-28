@@ -11,6 +11,7 @@ import 'package:auto_orientation_v2/auto_orientation_v2.dart';
 
 import 'api/audio_handler.dart';
 import 'api/audiobook_player_service.dart';
+import 'api/settings_service.dart';
 import 'api/torrent_stream_service.dart';
 import 'api/tmdb_api.dart';
 import 'api/local_server_service.dart';
@@ -90,6 +91,9 @@ void main() async {
   
   MusicPlayerService().setHandler(audioHandler);
   AudiobookPlayerService().init(audioHandler);
+  
+  // Hydrate light mode setting before first frame
+  await SettingsService().initLightMode();
   
   PlayerPoolService().warmUp();
   debugPrint('[Boot] All init complete — launching app');
